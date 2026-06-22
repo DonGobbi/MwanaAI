@@ -50,6 +50,30 @@ Write a brief report with these Markdown sections: **Summary**, **Students who m
     );
   },
 
+  // Targeted feedback after a quiz, based on the questions the student missed.
+  async quizFeedback({ subject, level, score, total, wrong }) {
+    const items = wrong
+      .map((w, i) => `${i + 1}. Question: ${w.question}\n   Correct answer: ${w.correct}\n   I answered: ${w.your}`)
+      .join('\n');
+    const prompt =
+      wrong.length === 0
+        ? `I scored ${score}/${total} (full marks) on a ${subject} quiz. In a short Markdown note, congratulate me and suggest one slightly harder thing to try next.`
+        : `I did a ${subject} quiz and scored ${score}/${total}. Here are the questions I got wrong:
+${items}
+
+In short Markdown: list the specific **topics/concepts to review** (grouped), give one quick tip for each, and end with a sentence of encouragement.`;
+    return groqChat(
+      [
+        {
+          role: 'system',
+          content: `You are MwanaAI, a warm, encouraging tutor for a ${level} student in Malawi.`,
+        },
+        { role: 'user', content: prompt },
+      ],
+      { maxTokens: 800 }
+    );
+  },
+
   // A personalised study plan for a student based on their quiz averages (Markdown).
   async studyPlan({ level, subjectScores }) {
     const data = subjectScores

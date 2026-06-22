@@ -62,5 +62,13 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
       allow delete: if signedIn() && resource.data.studentId == request.auth.uid;
     }
+
+    // Assignments — readable by any signed-in user (students see their class's
+    // tasks); only the owning teacher can create or remove them.
+    match /assignments/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
+    }
   }
 }

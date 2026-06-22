@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
 import { aiInsights } from '../services/aiInsightsService';
+import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
-import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2 } from 'react-icons/fi';
+import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard } from 'react-icons/fi';
 
 function timeAgo(ts) {
   if (!ts) return 'never';
@@ -82,6 +83,114 @@ const LessonPlanner = () => {
         <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
           <Markdown content={plan} />
         </div>
+      )}
+    </div>
+  );
+};
+
+// Create and track assignments for one class.
+const Assignments = ({ cls, teacher, memberCount }) => {
+  const [list, setList] = useState([]);
+  const [subject, setSubject] = useState('');
+  const [topic, setTopic] = useState('');
+  const [examType, setExamType] = useState('');
+  const [count, setCount] = useState(5);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const items = await assignmentService.listForClass(cls.id);
+      const withCounts = await Promise.all(
+        items.map(async (a) => ({ ...a, done: await assignmentService.completionCount(a.id) }))
+      );
+      setList(withCounts);
+    } catch (err) {
+      console.error('Could not load assignments:', err);
+    }
+  }, [cls.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const create = async (e) => {
+    e.preventDefault();
+    if (!subject) return;
+    setBusy(true);
+    try {
+      await assignmentService.create(teacher, cls, {
+        subject,
+        subjectLabel: getSubject(subject)?.label || subject,
+        topic,
+        examType,
+        count,
+      });
+      setTopic('');
+      load();
+    } catch (err) {
+      console.error('Could not create assignment:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id) => {
+    try {
+      await assignmentService.remove(id);
+      load();
+    } catch (err) {
+      console.error('Could not remove assignment:', err);
+    }
+  };
+
+  return (
+    <div className="card p-5 mb-5">
+      <div className="flex items-center gap-2 mb-1">
+        <FiClipboard className="text-primary-600" />
+        <h2 className="font-bold text-gray-900">Assignments</h2>
+      </div>
+      <p className="text-sm text-gray-500 mb-3">Set a quiz task for the class. Students see it on their dashboard.</p>
+
+      <form onSubmit={create} className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        <select value={subject} onChange={(e) => setSubject(e.target.value)}
+          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+          <option value="">Subject</option>
+          {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (optional)"
+          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+        <select value={examType} onChange={(e) => setExamType(e.target.value)}
+          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+          {EXAM_TYPES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+        </select>
+        <div className="flex gap-2">
+          <select value={count} onChange={(e) => setCount(Number(e.target.value))}
+            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+            <option value={5}>5 questions</option>
+            <option value={10}>10 questions</option>
+          </select>
+          <button type="submit" disabled={busy || !subject}
+            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors">
+            {busy ? '…' : 'Assign'}
+          </button>
+        </div>
+      </form>
+
+      {list.length > 0 && (
+        <ul className="divide-y divide-gray-100">
+          {list.map((a) => (
+            <li key={a.id} className="flex items-center justify-between py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{a.title}</p>
+                <p className="text-xs text-gray-400">
+                  {a.examType && a.examType !== '' ? `${a.examType} · ` : ''}{a.count} questions ·{' '}
+                  {a.done}/{memberCount} completed
+                </p>
+              </div>
+              <button onClick={() => remove(a.id)} className="text-gray-300 hover:text-red-500 text-lg px-2">×</button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -210,6 +319,8 @@ const Teacher = () => {
               </p>
             )}
           </div>
+
+          <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
 
           {loadingMembers ? (
             <p className="text-gray-500">Loading students…</p>

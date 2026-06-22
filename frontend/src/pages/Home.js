@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
+import { assignmentService } from '../services/assignmentService';
 import Onboarding, { ONBOARDED_KEY } from '../components/Onboarding';
 import {
   FiBookOpen,
@@ -13,6 +14,7 @@ import {
   FiZap,
   FiTarget,
   FiAward,
+  FiClipboard,
 } from 'react-icons/fi';
 
 const STUDENT_CARDS = [
@@ -121,6 +123,72 @@ const JoinClassCard = () => {
   );
 };
 
+// Student assignments (tasks set by their teachers).
+const StudentAssignments = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [items, setItems] = useState([]);
+  const [done, setDone] = useState(new Set());
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!currentUser) return;
+      try {
+        const classes = await classService.listClassesForStudent(currentUser.uid);
+        const ids = classes.map((c) => c.classId);
+        const [assignments, completed] = await Promise.all([
+          assignmentService.listForStudent(ids),
+          assignmentService.completedByStudent(currentUser.uid),
+        ]);
+        if (active) {
+          setItems(assignments);
+          setDone(completed);
+        }
+      } catch (err) {
+        console.error('Could not load assignments:', err);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
+  if (!items.length) return null;
+
+  return (
+    <div className="card p-5 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <FiClipboard className="text-primary-600" />
+        <p className="font-semibold text-gray-900">Your assignments</p>
+      </div>
+      <ul className="space-y-2">
+        {items.map((a) => {
+          const isDone = done.has(a.id);
+          return (
+            <li key={a.id} className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{a.title}</p>
+                <p className="text-xs text-gray-400">{a.className} · {a.count} questions</p>
+              </div>
+              {isDone ? (
+                <span className="text-xs text-green-600 font-medium flex-shrink-0">Done ✓</span>
+              ) : (
+                <button
+                  onClick={() => navigate('/quiz', { state: { assignment: a } })}
+                  className="bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors"
+                >
+                  Start
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
+
 const Home = () => {
   const { currentUser, userProfile } = useAuth();
   const role = userProfile?.userType || 'student';
@@ -166,6 +234,7 @@ const Home = () => {
             </div>
           ) : (
             <>
+              <StudentAssignments />
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 {STUDENT_CARDS.map((c) => (
                   <ActionCard key={c.to} {...c} />
