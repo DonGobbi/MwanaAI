@@ -43,7 +43,7 @@ const Navbar = () => {
 
           <div className="flex items-center gap-4 sm:gap-6">
             <ThemeToggle />
-            {currentUser && role === 'student' && <NotificationBell />}
+            {currentUser && (role === 'student' || role === 'teacher') && <NotificationBell />}
             {currentUser ? (
               <>
                 {role === 'teacher' ? (

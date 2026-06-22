@@ -50,6 +50,31 @@ Write a brief report with these Markdown sections: **Summary**, **Students who m
     );
   },
 
+  // A teacher-facing recommendation for how to help one specific student.
+  async studentRecommendation({ name, level, subjectScores }) {
+    const data =
+      subjectScores.map((s) => `- ${s.subject}: ${s.avg}% over ${s.count} quiz(zes)`).join('\n') ||
+      '(no quizzes yet)';
+    return groqChat(
+      [
+        {
+          role: 'system',
+          content:
+            'You are a teaching assistant helping a teacher in Malawi. Give a short, practical recommendation in Markdown about how to support one specific student.',
+        },
+        {
+          role: 'user',
+          content: `Student: ${name} (${level}).
+Quiz averages by subject:
+${data}
+
+In short Markdown: what this student is doing well, where they need support, and 2 specific things the teacher can do to help.`,
+        },
+      ],
+      { maxTokens: 700 }
+    );
+  },
+
   // Targeted feedback after a quiz, based on the questions the student missed.
   async quizFeedback({ subject, level, score, total, wrong }) {
     const items = wrong

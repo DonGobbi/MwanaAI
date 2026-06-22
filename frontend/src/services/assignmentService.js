@@ -49,6 +49,21 @@ export const assignmentService = {
     return snap.size;
   },
 
+  // Assignment submissions across a teacher's classes (optionally only newer
+  // than `since`) — used for teacher notifications.
+  async teacherSubmissions(classIds, since = 0) {
+    if (!classIds || !classIds.length) return [];
+    const out = [];
+    for (const cid of classIds) {
+      const snap = await getDocs(query(collection(db, 'quiz_results'), where('classId', '==', cid)));
+      snap.docs.forEach((d) => {
+        const x = d.data();
+        if (x.assignmentId && (x.createdAt || 0) > since) out.push(x);
+      });
+    }
+    return out;
+  },
+
   // The set of assignmentIds a given student has completed.
   async completedByStudent(studentId) {
     const snap = await getDocs(query(collection(db, 'quiz_results'), where('userId', '==', studentId)));

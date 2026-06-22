@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
+import { quizService } from '../services/quizService';
 import { aiInsights } from '../services/aiInsightsService';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
@@ -232,8 +233,144 @@ const Assignments = ({ cls, teacher, memberCount }) => {
   );
 };
 
+// Drill into one student's full history and get an AI recommendation.
+const StudentDetail = ({ member, onBack }) => {
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [rec, setRec] = useState('');
+  const [loadingRec, setLoadingRec] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const r = await quizService.listResults(member.studentId);
+        if (active) setResults(r);
+      } catch (err) {
+        console.error('Could not load student history:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [member.studentId]);
+
+  const bySubject = {};
+  results.forEach((r) => {
+    const k = r.subjectLabel || r.subject || 'Other';
+    if (!bySubject[k]) bySubject[k] = { sum: 0, n: 0 };
+    bySubject[k].sum += r.percentage || 0;
+    bySubject[k].n += 1;
+  });
+  const subjectRows = Object.entries(bySubject)
+    .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.n), count: v.n }))
+    .sort((a, b) => b.avg - a.avg);
+  const avg = results.length
+    ? Math.round(results.reduce((a, r) => a + (r.percentage || 0), 0) / results.length)
+    : null;
+
+  const getRec = async () => {
+    setLoadingRec(true);
+    setRec('');
+    try {
+      const rr = await aiInsights.studentRecommendation({
+        name: member.studentName,
+        level: 'their class',
+        subjectScores: subjectRows.map((s) => ({ subject: s.name, avg: s.avg, count: s.count })),
+      });
+      setRec(rr);
+    } catch (err) {
+      setRec(`*${err.message || 'Could not get a recommendation.'}*`);
+    } finally {
+      setLoadingRec(false);
+    }
+  };
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container py-8 max-w-3xl">
+        <button onClick={onBack} className="text-sm text-primary-600 hover:underline mb-4">← Back to class</button>
+
+        <div className="card p-5 mb-5">
+          <h1 className="text-2xl font-bold text-gray-900">{member.studentName}</h1>
+          <p className="text-sm text-gray-400 mb-4">{member.studentEmail}</p>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div><p className="text-2xl font-bold text-primary-600">{results.length}</p><p className="text-xs text-gray-500">Quizzes</p></div>
+            <div><p className="text-2xl font-bold text-primary-600">{avg == null ? '—' : `${avg}%`}</p><p className="text-xs text-gray-500">Average</p></div>
+            <div><p className="text-2xl font-bold text-primary-600">{member.summary?.lessonsCompleted ?? 0}</p><p className="text-xs text-gray-500">Lessons</p></div>
+          </div>
+        </div>
+
+        {/* AI recommendation */}
+        <div className="card p-5 mb-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <FiZap className="text-primary-600" />
+              <h2 className="font-bold text-gray-900">AI recommendation</h2>
+            </div>
+            <button onClick={getRec} disabled={loadingRec}
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {loadingRec ? 'Thinking…' : rec ? 'Refresh' : '✨ How can I help this student?'}
+            </button>
+          </div>
+          {rec && (
+            <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in"><Markdown content={rec} /></div>
+          )}
+        </div>
+
+        {loading ? (
+          <p className="text-gray-500">Loading history…</p>
+        ) : results.length === 0 ? (
+          <div className="card p-6">
+            <EmptyState compact icon={FiBarChart2} title="No quizzes yet"
+              description="This student hasn't taken any quizzes yet." />
+          </div>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
+            <div className="card divide-y divide-gray-100 mb-6">
+              {subjectRows.map((s) => (
+                <div key={s.name} className="px-4 py-3">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium text-gray-800">{s.name}</span>
+                    <span className="text-gray-500">{s.avg}% · {s.count} quiz{s.count > 1 ? 'zes' : ''}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className={`h-2 rounded-full ${s.avg >= 80 ? 'bg-green-500' : s.avg >= 50 ? 'bg-primary-500' : 'bg-amber-500'}`}
+                      style={{ width: `${s.avg}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Quiz history</h2>
+            <div className="card divide-y divide-gray-100">
+              {results.slice(0, 25).map((r) => (
+                <div key={r.id} className="flex justify-between items-center px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {r.subjectLabel || r.subject}{r.examType && r.examType !== 'General' ? ` · ${r.examType}` : ''}
+                    </p>
+                    <p className="text-xs text-gray-400">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</p>
+                  </div>
+                  <span className={`text-sm font-semibold ${r.percentage >= 80 ? 'text-green-600' : r.percentage >= 50 ? 'text-primary-600' : 'text-amber-600'}`}>
+                    {r.score}/{r.total} · {r.percentage}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Teacher = () => {
   const { currentUser } = useAuth();
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
@@ -278,6 +415,7 @@ const Teacher = () => {
 
   const openClass = async (cls) => {
     setActive(cls);
+    setSelectedStudent(null);
     setLoadingMembers(true);
     setMembers([]);
     setInsights('');
@@ -312,6 +450,11 @@ const Teacher = () => {
       setLoadingInsights(false);
     }
   };
+
+  // ---- Single student detail ----
+  if (active && selectedStudent) {
+    return <StudentDetail member={selectedStudent} onBack={() => setSelectedStudent(null)} />;
+  }
 
   // ---- Class detail ----
   if (active) {
@@ -379,7 +522,8 @@ const Teacher = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {members.map((m) => (
-                    <tr key={m.id}>
+                    <tr key={m.id} onClick={() => setSelectedStudent(m)}
+                      className="cursor-pointer hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800">{m.studentName}</p>
                         <p className="text-xs text-gray-400">{m.studentEmail}</p>

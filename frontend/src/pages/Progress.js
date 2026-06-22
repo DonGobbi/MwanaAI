@@ -7,7 +7,24 @@ import { aiInsights } from '../services/aiInsightsService';
 import { getGradeLevel } from '../config/curriculum';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
+import Leaderboard from '../components/Leaderboard';
 import { FiBarChart2, FiZap } from 'react-icons/fi';
+
+// Current run of consecutive active days (based on quiz dates).
+function computeStreak(results) {
+  const days = new Set(results.map((r) => new Date(r.createdAt || 0).toDateString()));
+  let streak = 0;
+  const d = new Date();
+  if (!days.has(d.toDateString())) {
+    d.setDate(d.getDate() - 1);
+    if (!days.has(d.toDateString())) return 0;
+  }
+  while (days.has(d.toDateString())) {
+    streak += 1;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
 
 const Progress = () => {
   const { currentUser } = useAuth();
@@ -168,16 +185,28 @@ const Progress = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="card p-5 text-center">
                 <p className="text-3xl font-bold text-primary-600">{totalQuizzes}</p>
-                <p className="text-sm text-gray-500">Quizzes taken</p>
+                <p className="text-sm text-gray-500">Quizzes</p>
               </div>
               <div className="card p-5 text-center">
                 <p className="text-3xl font-bold text-primary-600">{avg}%</p>
-                <p className="text-sm text-gray-500">Average score</p>
+                <p className="text-sm text-gray-500">Average</p>
+              </div>
+              <div className="card p-5 text-center">
+                <p className="text-3xl font-bold text-amber-500">🔥 {computeStreak(results)}</p>
+                <p className="text-sm text-gray-500">Day streak</p>
               </div>
             </div>
+
+            {myClasses[0] && (
+              <Leaderboard
+                classId={myClasses[0].classId}
+                className={myClasses[0].className}
+                meId={currentUser?.uid}
+              />
+            )}
 
             {/* Smart study plan */}
             <div className="card p-5 mb-6">
