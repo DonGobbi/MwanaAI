@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { lessonService } from '../services/lessonService';
 import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
 import Markdown from '../components/Markdown';
+import Spinner, { PageLoader } from '../components/Spinner';
 
 const Learn = () => {
   const { currentUser, userProfile, updateGradeLevel } = useAuth();
@@ -127,7 +128,7 @@ const Learn = () => {
             </p>
 
             {loadingLesson ? (
-              <div className="py-10 text-center text-gray-500 animate-fade-in">Preparing your lesson…</div>
+              <PageLoader label="Preparing your lesson…" />
             ) : (
               <div className="animate-fade-in">
                 <Markdown content={lesson} />
@@ -202,8 +203,8 @@ const Learn = () => {
         </div>
 
         <button onClick={loadTopics} disabled={loadingTopics}
-          className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium px-5 py-2 rounded-lg mb-6">
-          {loadingTopics ? 'Loading topics…' : 'Show topics'}
+          className="inline-flex items-center justify-center w-full sm:w-auto bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium px-5 py-2 rounded-lg mb-6 transition-colors">
+          {loadingTopics ? <Spinner className="w-5 h-5" label="Loading topics…" /> : 'Show topics'}
         </button>
 
         {topics.length > 0 && (

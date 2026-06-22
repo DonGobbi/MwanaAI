@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
 import { aiInsights } from '../services/aiInsightsService';
 import Markdown from '../components/Markdown';
+import Spinner from '../components/Spinner';
 import {
   SUBJECTS,
   GRADE_LEVELS,
@@ -283,8 +284,8 @@ const Quiz = () => {
             </div>
 
             <button onClick={startQuiz} disabled={loading}
-              className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition-colors">
-              {loading ? 'Generating your quiz…' : 'Start quiz'}
+              className="w-full flex items-center justify-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition-colors">
+              {loading ? <Spinner className="w-5 h-5" label="Generating your quiz…" /> : 'Start quiz'}
             </button>
           </div>
         </div>
@@ -378,8 +379,8 @@ const Quiz = () => {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h2 className="font-bold text-gray-900">✨ AI feedback</h2>
             <button onClick={getFeedback} disabled={loadingFeedback}
-              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-              {loadingFeedback ? 'Thinking…' : feedback ? 'Refresh' : 'What should I review?'}
+              className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {loadingFeedback ? <Spinner className="w-4 h-4" label="Thinking…" /> : feedback ? 'Refresh' : 'What should I review?'}
             </button>
           </div>
           {feedback ? (

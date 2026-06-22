@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { classService } from '../services/classService';
 import { printStudentReport } from '../utils/printReport';
+import Spinner from '../components/Spinner';
 import { FiPrinter } from 'react-icons/fi';
 
 const STORAGE_KEY = 'mwanaai_child_email';
@@ -71,8 +72,8 @@ const ParentChild = () => {
             className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
           />
           <button type="submit" disabled={loading}
-            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-lg">
-            {loading ? 'Loading…' : 'View'}
+            className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-lg transition-colors">
+            {loading ? <Spinner className="w-5 h-5" /> : 'View'}
           </button>
         </form>
 

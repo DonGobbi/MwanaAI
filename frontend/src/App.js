@@ -11,6 +11,7 @@ import Quiz from './pages/Quiz';
 import Progress from './pages/Progress';
 import Teacher from './pages/Teacher';
 import ParentChild from './pages/ParentChild';
+import { PageLoader } from './components/Spinner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Protected route component
@@ -20,7 +21,9 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">Loading…</div>
+      <div className="flex justify-center items-center h-screen">
+        <PageLoader />
+      </div>
     );
   }
 

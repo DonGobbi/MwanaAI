@@ -6,6 +6,7 @@ import { aiInsights } from '../services/aiInsightsService';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
+import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
 import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter } from 'react-icons/fi';
@@ -97,8 +98,8 @@ const LessonPlanner = ({ classes, teacher }) => {
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
 
       <button onClick={generate} disabled={loading}
-        className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
-        {loading ? 'Generating…' : 'Generate lesson plan'}
+        className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+        {loading ? <Spinner className="w-4 h-4" label="Generating…" /> : 'Generate lesson plan'}
       </button>
 
       {classes && classes.length > 0 && subject && topic.trim() && (
@@ -330,8 +331,8 @@ const StudentDetail = ({ member, onBack }) => {
               <h2 className="font-bold text-gray-900">AI recommendation</h2>
             </div>
             <button onClick={getRec} disabled={loadingRec}
-              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-              {loadingRec ? 'Thinking…' : rec ? 'Refresh' : '✨ How can I help this student?'}
+              className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {loadingRec ? <Spinner className="w-4 h-4" label="Thinking…" /> : rec ? 'Refresh' : '✨ How can I help this student?'}
             </button>
           </div>
           {rec && (
@@ -340,7 +341,7 @@ const StudentDetail = ({ member, onBack }) => {
         </div>
 
         {loading ? (
-          <p className="text-gray-500">Loading history…</p>
+          <PageLoader label="Loading history…" />
         ) : results.length === 0 ? (
           <div className="card p-6">
             <EmptyState compact icon={FiBarChart2} title="No quizzes yet"
@@ -503,8 +504,8 @@ const Teacher = () => {
                 <h2 className="font-bold text-gray-900">AI Class Insights</h2>
               </div>
               <button onClick={analyzeClass} disabled={loadingMembers || loadingInsights}
-                className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                {loadingInsights ? 'Analysing…' : '✨ Analyse class'}
+                className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                {loadingInsights ? <Spinner className="w-4 h-4" label="Analysing…" /> : '✨ Analyse class'}
               </button>
             </div>
             {insights ? (
@@ -521,7 +522,7 @@ const Teacher = () => {
           <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
 
           {loadingMembers ? (
-            <p className="text-gray-500">Loading students…</p>
+            <PageLoader label="Loading students…" />
           ) : members.length === 0 ? (
             <div className="card p-6">
               <EmptyState compact icon={FiUsers} title="No students yet"
@@ -590,7 +591,7 @@ const Teacher = () => {
         </form>
 
         {loading ? (
-          <p className="text-gray-500">Loading…</p>
+          <PageLoader />
         ) : classes.length === 0 ? (
           <div className="card p-6">
             <EmptyState icon={FiUsers} title="No classes yet"

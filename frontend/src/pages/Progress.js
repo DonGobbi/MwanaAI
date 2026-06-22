@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
 import Leaderboard from '../components/Leaderboard';
 import Badges from '../components/Badges';
+import Spinner, { PageLoader } from '../components/Spinner';
 import { computeBadges } from '../utils/badges';
 import { FiBarChart2, FiZap } from 'react-icons/fi';
 
@@ -204,7 +205,7 @@ const Progress = () => {
         {!loading && hasActivity && <Badges badges={badges} />}
 
         {loading ? (
-          <p className="text-gray-500">Loading…</p>
+          <PageLoader />
         ) : totalQuizzes === 0 ? (
           <div className="card p-6">
             <EmptyState
@@ -250,8 +251,8 @@ const Progress = () => {
                   <h2 className="font-bold text-gray-900">Smart Study Plan</h2>
                 </div>
                 <button onClick={getStudyPlan} disabled={loadingPlan}
-                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  {loadingPlan ? 'Thinking…' : studyPlan ? 'Refresh plan' : '✨ Get my study plan'}
+                  className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {loadingPlan ? <Spinner className="w-4 h-4" label="Thinking…" /> : studyPlan ? 'Refresh plan' : '✨ Get my study plan'}
                 </button>
               </div>
               {studyPlan ? (
