@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="200" fill="#7c3aed" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="50" cy="50" r="25" />
+    <circle cx="250" cy="50" r="20" />
+    <circle cx="50" cy="150" r="20" />
+    <circle cx="250" cy="150" r="25" />
+    <path d="M70,40 L230,40 L150,70 Z" />
+    <path d="M40,70 L40,130 L70,100 Z" />
+    <path d="M260,70 L260,130 L230,100 Z" />
+    <path d="M70,160 L230,160 L150,130 Z" />
+  </g>
+  
+  <!-- Video player -->
+  <g transform="translate(150, 100)">
+    <!-- Video frame -->
+    <rect x="-80" y="-50" width="160" height="100" rx="5" fill="#1e1b4b" />
+    <rect x="-75" y="-45" width="150" height="80" fill="#000000" />
+    
+    <!-- Video content - English lesson -->
+    <rect x="-65" y="-35" width="130" height="60" fill="#4c1d95" />
+    
+    <!-- Book and pen illustration -->
+    <g transform="translate(0, -5)">
+      <!-- Open book -->
+      <path d="M-30,-15 L30,-15 L30,15 L-30,15 Z" fill="#f8fafc" />
+      <path d="M-30,-15 L0,-10 L30,-15 M-30,15 L0,20 L30,15 M0,-10 L0,20" fill="none" stroke="#1e293b" stroke-width="1" />
+      
+      <!-- Text lines on pages -->
+      <path d="M-25,-10 L-5,-10 M-25,-5 L-5,-5 M-25,0 L-5,0 M-25,5 L-5,5 M-25,10 L-5,10" stroke="#1e293b" stroke-width="0.5" />
+      <path d="M5,-10 L25,-10 M5,-5 L25,-5 M5,0 L25,0 M5,5 L25,5 M5,10 L25,10" stroke="#1e293b" stroke-width="0.5" />
+      
+      <!-- Pen -->
+      <path d="M35,-20 L40,-25 L45,-20 L40,10 L35,-20 Z" fill="#0369a1" />
+      <path d="M40,10 L38,15 L42,15 L40,10 Z" fill="#0ea5e9" />
+    </g>
+    
+    <!-- Video controls -->
+    <rect x="-75" y="35" width="150" height="10" rx="2" fill="#1e1b4b" />
+    <rect x="-70" y="37" width="50" height="6" rx="3" fill="#a78bfa" />
+    <circle cx="-20" cy="40" r="3" fill="#ffffff" />
+    
+    <!-- Play button -->
+    <circle cx="0" cy="0" r="15" fill="rgba(255,255,255,0.3)" />
+    <path d="M-5,-8 L8,0 L-5,8 Z" fill="#ffffff" />
+  </g>
+  
+  <!-- Video time -->
+  <text x="210" y="145" font-family="Arial, sans-serif" font-size="10" fill="#ffffff">45:00</text>
+  
+  <!-- Title -->
+  <rect x="50" y="150" width="200" height="30" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="170" font-family="Arial, sans-serif" font-weight="bold" font-size="14" text-anchor="middle" fill="#4c1d95">English Grammar Videos</text>
+</svg>

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets — never commit real keys
+.env
+.env.*
+!.env.example
+
+# Firebase / Google service-account keys
+serviceAccountKey.json
+firebase-service-account-key.json
+*-service-account*.json
+
+# Build output
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Test coverage
+coverage/

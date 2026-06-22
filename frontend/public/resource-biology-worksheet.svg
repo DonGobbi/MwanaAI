@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="200" fill="#059669" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="40" cy="40" r="20" />
+    <circle cx="260" cy="40" r="15" />
+    <circle cx="40" cy="160" r="15" />
+    <circle cx="260" cy="160" r="20" />
+    <path d="M60,30 L240,30 L150,60 Z" />
+    <path d="M30,60 L30,140 L60,100 Z" />
+    <path d="M270,60 L270,140 L240,100 Z" />
+    <path d="M60,170 L240,170 L150,140 Z" />
+  </g>
+  
+  <!-- Worksheet -->
+  <g transform="translate(150, 100)">
+    <!-- Paper -->
+    <rect x="-70" y="-80" width="140" height="160" fill="#f8fafc" />
+    <line x1="-70" y1="-60" x2="70" y2="-60" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="-40" x2="70" y2="-40" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="-20" x2="70" y2="-20" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="0" x2="70" y2="0" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="20" x2="70" y2="20" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="40" x2="70" y2="40" stroke="#94a3b8" stroke-width="1" />
+    <line x1="-70" y1="60" x2="70" y2="60" stroke="#94a3b8" stroke-width="1" />
+    
+    <!-- Red margin line -->
+    <line x1="-60" y1="-80" x2="-60" y2="80" stroke="#ef4444" stroke-width="1" />
+    
+    <!-- Biology diagram -->
+    <g transform="translate(0, -30)">
+      <!-- Cell outline -->
+      <ellipse cx="0" cy="0" rx="40" ry="30" fill="#d1fae5" stroke="#059669" stroke-width="2" />
+      
+      <!-- Nucleus -->
+      <ellipse cx="0" cy="0" rx="15" ry="12" fill="#a7f3d0" stroke="#059669" stroke-width="1.5" />
+      
+      <!-- Chromosomes -->
+      <path d="M-5,-5 C-3,-8 3,-8 5,-5 C8,-3 8,3 5,5 C3,8 -3,8 -5,5 C-8,3 -8,-3 -5,-5 Z" fill="#059669" />
+      
+      <!-- Mitochondria -->
+      <ellipse cx="25" cy="10" rx="10" ry="5" fill="#a7f3d0" stroke="#059669" stroke-width="1" />
+      <path d="M15,10 C18,8 22,12 25,10 C28,8 32,12 35,10" fill="none" stroke="#059669" stroke-width="1" />
+      
+      <!-- Endoplasmic reticulum -->
+      <path d="M-30,-15 C-25,-18 -15,-12 -10,-15 C-5,-18 5,-12 10,-15" fill="none" stroke="#059669" stroke-width="1" />
+      <path d="M-30,-10 C-25,-13 -15,-7 -10,-10 C-5,-13 5,-7 10,-10" fill="none" stroke="#059669" stroke-width="1" />
+      
+      <!-- Golgi apparatus -->
+      <path d="M-30,15 C-28,13 -26,17 -24,15 M-24,15 C-22,13 -20,17 -18,15 M-18,15 C-16,13 -14,17 -12,15" fill="none" stroke="#059669" stroke-width="1.5" />
+    </g>
+    
+    <!-- Labels -->
+    <text x="-55" y="-65" font-family="Arial, sans-serif" font-size="8" fill="#1e293b">Name:</text>
+    <line x1="-30" y1="-65" x2="60" y2="-65" stroke="#1e293b" stroke-width="0.5" />
+    
+    <text x="-55" y="75" font-family="Arial, sans-serif" font-size="6" fill="#1e293b">Label the parts of the cell:</text>
+  </g>
+  
+  <!-- Title -->
+  <rect x="50" y="150" width="200" height="30" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="170" font-family="Arial, sans-serif" font-weight="bold" font-size="14" text-anchor="middle" fill="#064e3b">Biology Cell Worksheet</text>
+</svg>

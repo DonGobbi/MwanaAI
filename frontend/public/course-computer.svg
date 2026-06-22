@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="250" fill="#0891b2"/>
+  <g fill="#FFFFFF">
+    <!-- Computer monitor -->
+    <rect x="120" y="70" width="160" height="100" rx="5" stroke="#FFFFFF" stroke-width="3" fill="none"/>
+    <!-- Screen -->
+    <rect x="130" y="80" width="140" height="80" fill="#FFFFFF" fill-opacity="0.2"/>
+    <!-- Code symbols -->
+    <text x="140" y="100" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;html&gt;</text>
+    <text x="150" y="115" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;head&gt;</text>
+    <text x="150" y="130" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;/head&gt;</text>
+    <text x="150" y="145" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;body&gt;</text>
+    <text x="150" y="160" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;/body&gt;</text>
+    <text x="140" y="175" font-family="monospace" font-size="12" fill="#FFFFFF">&lt;/html&gt;</text>
+    <!-- Stand -->
+    <path d="M180,170 h40 v10 h-80 v-10 h40" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+    <!-- Base -->
+    <rect x="150" y="180" width="100" height="10" rx="2"/>
+  </g>
+  <text x="200" y="215" font-family="Arial, sans-serif" font-size="24" fill="#FFFFFF" text-anchor="middle">Computer Studies</text>
+</svg>

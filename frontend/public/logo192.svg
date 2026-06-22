@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Background Circle -->
+  <circle cx="96" cy="96" r="90" fill="#0369a1" />
+  
+  <!-- Letter M stylized -->
+  <path d="M56 56 L56 136 L76 136 L96 96 L116 136 L136 136 L136 56 L116 56 L116 106 L96 66 L76 106 L76 56 Z" fill="white" />
+  
+  <!-- AI text -->
+  <text x="96" y="170" font-family="Arial, sans-serif" font-size="28" font-weight="bold" text-anchor="middle" fill="white">AI</text>
+  
+  <!-- Brain icon simplified -->
+  <path d="M96 30 C116 30, 126 40, 126 50 C126 60, 116 70, 106 70 C116 80, 116 90, 106 100 C96 110, 86 100, 86 90 C76 100, 66 100, 66 90 C66 80, 76 70, 86 70 C76 60, 76 40, 96 30" fill="#f0f9ff" opacity="0.7" />
+</svg>

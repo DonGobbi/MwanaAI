@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#e5e7eb" />
+  
+  <!-- Map grid lines -->
+  <g stroke="#cbd5e1" stroke-width="1">
+    <line x1="0" y1="100" x2="800" y2="100" />
+    <line x1="0" y1="200" x2="800" y2="200" />
+    <line x1="0" y1="300" x2="800" y2="300" />
+    <line x1="0" y1="400" x2="800" y2="400" />
+    <line x1="0" y1="500" x2="800" y2="500" />
+    
+    <line x1="100" y1="0" x2="100" y2="600" />
+    <line x1="200" y1="0" x2="200" y2="600" />
+    <line x1="300" y1="0" x2="300" y2="600" />
+    <line x1="400" y1="0" x2="400" y2="600" />
+    <line x1="500" y1="0" x2="500" y2="600" />
+    <line x1="600" y1="0" x2="600" y2="600" />
+    <line x1="700" y1="0" x2="700" y2="600" />
+  </g>
+  
+  <!-- Simplified Malawi country outline -->
+  <path d="M350,150 C380,160 420,170 440,200 C460,230 470,280 480,320 C490,360 500,400 480,440 C460,480 420,500 380,510 C340,520 300,510 270,480 C240,450 230,410 240,370 C250,330 270,290 290,250 C310,210 330,170 350,150 Z" 
+        fill="#d1d5db" stroke="#94a3b8" stroke-width="2" />
+  
+  <!-- Main roads -->
+  <path d="M400,300 L500,350 L550,450" stroke="#9ca3af" stroke-width="4" fill="none" />
+  <path d="M400,300 L300,380 L250,450" stroke="#9ca3af" stroke-width="4" fill="none" />
+  <path d="M400,300 L420,200" stroke="#9ca3af" stroke-width="4" fill="none" />
+  
+  <!-- Location marker -->
+  <g transform="translate(400, 300)">
+    <!-- Shadow -->
+    <ellipse cx="0" cy="0" rx="15" ry="5" fill="rgba(0,0,0,0.3)" />
+    
+    <!-- Pin -->
+    <path d="M0,-40 C-15,-40 -25,-25 -25,-10 C-25,10 0,40 0,40 C0,40 25,10 25,-10 C25,-25 15,-40 0,-40 Z" 
+          fill="#0369a1" stroke="#0284c7" stroke-width="2" />
+    
+    <!-- Inner circle -->
+    <circle cx="0" cy="-20" r="8" fill="#bae6fd" />
+  </g>
+  
+  <!-- City name -->
+  <g transform="translate(400, 340)">
+    <rect x="-60" y="-15" width="120" height="30" rx="5" fill="white" stroke="#94a3b8" />
+    <text x="0" y="5" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Lilongwe, Malawi</text>
+  </g>
+  
+  <!-- Compass -->
+  <g transform="translate(700, 100)">
+    <circle cx="0" cy="0" r="30" fill="white" stroke="#94a3b8" stroke-width="1" />
+    <path d="M0,-25 L5,-5 L0,-10 L-5,-5 Z" fill="#0369a1" />
+    <path d="M0,25 L5,5 L0,10 L-5,5 Z" fill="#dc2626" />
+    <text x="0" y="-30" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">N</text>
+    <text x="30" y="5" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">E</text>
+    <text x="0" y="40" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">S</text>
+    <text x="-30" y="5" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">W</text>
+  </g>
+  
+  <!-- Scale -->
+  <g transform="translate(100, 500)">
+    <line x1="0" y1="0" x2="100" y2="0" stroke="#1e293b" stroke-width="2" />
+    <line x1="0" y1="-5" x2="0" y2="5" stroke="#1e293b" stroke-width="2" />
+    <line x1="100" y1="-5" x2="100" y2="5" stroke="#1e293b" stroke-width="2" />
+    <text x="50" y="20" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">10 km</text>
+  </g>
+  
+  <!-- MwanaAI logo watermark -->
+  <text x="650" y="550" font-family="Arial, sans-serif" font-weight="bold" font-size="18" fill="#0369a1">MwanaAI</text>
+</svg>

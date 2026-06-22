@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="300" fill="#7c3aed" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="40" cy="40" r="25" />
+    <circle cx="260" cy="40" r="20" />
+    <circle cx="40" cy="260" r="15" />
+    <circle cx="260" cy="260" r="30" />
+    <path d="M90,40 L210,40 L150,90 Z" />
+    <path d="M40,90 L40,210 L90,150 Z" />
+    <path d="M260,90 L260,210 L210,150 Z" />
+    <path d="M90,260 L210,260 L150,210 Z" />
+  </g>
+  
+  <!-- Tech elements -->
+  <g opacity="0.2" fill="#ffffff">
+    <circle cx="75" cy="75" r="5" />
+    <circle cx="225" cy="75" r="5" />
+    <circle cx="75" cy="225" r="5" />
+    <circle cx="225" cy="225" r="5" />
+    <line x1="75" y1="75" x2="225" y2="75" stroke="#ffffff" stroke-width="1" />
+    <line x1="75" y1="75" x2="75" y2="225" stroke="#ffffff" stroke-width="1" />
+    <line x1="225" y1="75" x2="225" y2="225" stroke="#ffffff" stroke-width="1" />
+    <line x1="75" y1="225" x2="225" y2="225" stroke="#ffffff" stroke-width="1" />
+    <line x1="75" y1="75" x2="225" y2="225" stroke="#ffffff" stroke-width="1" />
+    <line x1="225" y1="75" x2="75" y2="225" stroke="#ffffff" stroke-width="1" />
+  </g>
+  
+  <!-- Person silhouette -->
+  <g transform="translate(150, 130)">
+    <!-- Head -->
+    <circle cx="0" cy="-60" r="40" fill="#ffffff" />
+    
+    <!-- Hair -->
+    <path d="M-40,-70 C-40,-100 40,-100 40,-70 C40,-70 40,-40 40,-40 C40,-40 30,-50 30,-60 C30,-60 20,-50 10,-60 C10,-60 0,-50 -10,-60 C-10,-60 -20,-50 -30,-60 C-30,-60 -40,-50 -40,-40 Z" fill="#1e293b" />
+    
+    <!-- Glasses -->
+    <rect x="-30" y="-70" width="20" height="15" rx="5" fill="none" stroke="#1e293b" stroke-width="2" />
+    <rect x="10" y="-70" width="20" height="15" rx="5" fill="none" stroke="#1e293b" stroke-width="2" />
+    <line x1="-10" y1="-62" x2="10" y2="-62" stroke="#1e293b" stroke-width="2" />
+    
+    <!-- Body -->
+    <path d="M-40,-20 C-40,20 -30,60 -60,100 L60,100 C30,60 40,20 40,-20 C40,-20 0,0 0,0 C0,0 -40,-20 -40,-20 Z" fill="#ffffff" />
+    
+    <!-- Tech pattern on shirt -->
+    <path d="M-20,20 L20,20 M-30,40 L30,40 M-25,60 L25,60" stroke="#7c3aed" stroke-width="2" />
+    <circle cx="-10" cy="30" r="5" fill="#7c3aed" />
+    <circle cx="10" cy="50" r="5" fill="#7c3aed" />
+  </g>
+  
+  <!-- Name -->
+  <rect x="75" y="240" width="150" height="40" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="265" font-family="Arial, sans-serif" font-weight="bold" font-size="16" text-anchor="middle" fill="#4c1d95">David Mwanza</text>
+  <text x="150" y="280" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#4c1d95">AI Specialist</text>
+</svg>

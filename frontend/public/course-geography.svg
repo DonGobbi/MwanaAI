@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="250" fill="#4d7c0f"/>
+  <g fill="#FFFFFF">
+    <!-- Globe -->
+    <circle cx="200" cy="125" r="70" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+    <!-- Latitude lines -->
+    <ellipse cx="200" cy="125" rx="70" ry="25" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <ellipse cx="200" cy="125" rx="70" ry="45" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <!-- Longitude lines -->
+    <path d="M200,55 C240,55 240,195 200,195 C160,195 160,55 200,55" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M130,125 C130,85 270,85 270,125 C270,165 130,165 130,125" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <!-- Africa outline (simplified) -->
+    <path d="M190,90 C200,85 210,90 215,100 C220,110 225,115 220,125 C215,135 220,145 215,155 C210,165 200,170 190,165 C185,160 180,155 180,145 C180,135 175,130 175,120 C175,110 180,95 190,90" fill="#FFFFFF" fill-opacity="0.7"/>
+  </g>
+  <text x="200" y="215" font-family="Arial, sans-serif" font-size="24" fill="#FFFFFF" text-anchor="middle">Geography</text>
+</svg>

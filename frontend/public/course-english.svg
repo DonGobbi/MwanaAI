@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="250" fill="#7c3aed"/>
+  <g fill="#FFFFFF">
+    <!-- Book -->
+    <path d="M120,80 v90 h160 v-90 h-160 z M130,90 h70 v70 h-70 v-70 z M210,90 h60 v70 h-60 v-70 z" />
+    <!-- Lines representing text -->
+    <rect x="140" y="100" width="50" height="5" />
+    <rect x="140" y="115" width="50" height="5" />
+    <rect x="140" y="130" width="50" height="5" />
+    <rect x="140" y="145" width="30" height="5" />
+    <!-- Pen -->
+    <path d="M220,100 l40,40 l-10,10 l-40,-40 z" />
+    <path d="M215,105 l5,-5 l40,40 l-5,5 z" />
+  </g>
+  <text x="200" y="200" font-family="Arial, sans-serif" font-size="24" fill="#FFFFFF" text-anchor="middle">English Language</text>
+</svg>

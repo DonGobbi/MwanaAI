@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Brain Icon -->
+  <path d="M35 10C26.7157 10 20 16.7157 20 25C20 33.2843 26.7157 40 35 40C43.2843 40 50 33.2843 50 25C50 16.7157 43.2843 10 35 10Z" fill="#0369A1"/>
+  <path d="M35 15C29.4772 15 25 19.4772 25 25C25 30.5228 29.4772 35 35 35C40.5228 35 45 30.5228 45 25C45 19.4772 40.5228 15 35 15Z" fill="#0EA5E9"/>
+  <path d="M35 20C32.2386 20 30 22.2386 30 25C30 27.7614 32.2386 30 35 30C37.7614 30 40 27.7614 40 25C40 22.2386 37.7614 20 35 20Z" fill="#FFFFFF"/>
+  
+  <!-- Circuit Lines -->
+  <path d="M35 40V45" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M35 45H45" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M45 45V50" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  
+  <path d="M35 40V45" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M35 45H25" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M25 45V50" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Text -->
+  <path d="M65 20H68L73 35L78 20H81L75 40H71L65 20Z" fill="#0369A1"/>
+  <path d="M85 20H88L93 35L98 20H101L95 40H91L85 20Z" fill="#0369A1"/>
+  <path d="M105 20H108L113 35L118 20H121L115 40H111L105 20Z" fill="#0369A1"/>
+  <path d="M125 20H128L133 35L138 20H141L135 40H131L125 20Z" fill="#0369A1"/>
+  <path d="M145 20H148L153 35L158 20H161L155 40H151L145 20Z" fill="#0369A1"/>
+  
+  <path d="M165 20H175V23H168V28H174V31H168V37H175V40H165V20Z" fill="#7C3AED"/>
+</svg>

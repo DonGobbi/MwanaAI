@@ -1,0 +1,61 @@
+/**
+ * Calculate difficulty level based on message content
+ * @param {array} messages - Array of conversation messages
+ * @returns {string} - Difficulty level (Basic, Intermediate, Advanced)
+ */
+const calculateDifficultyLevel = (messages) => {
+  // Simple heuristic based on message length and complexity
+  const complexityScore = messages.reduce((score, msg) => {
+    const wordCount = msg.content.split(/\s+/).length;
+    const longWords = msg.content.split(/\s+/).filter(word => word.length > 6).length;
+    return score + (wordCount * 0.1) + (longWords * 0.3);
+  }, 0);
+
+  if (complexityScore > 50) return 'Advanced';
+  if (complexityScore > 25) return 'Intermediate';
+  return 'Basic';
+};
+
+/**
+ * Calculate engagement level based on interaction patterns
+ * @param {array} messages - Array of conversation messages
+ * @returns {string} - Engagement level (Low, Medium, High)
+ */
+const calculateEngagementLevel = (messages) => {
+  const userMessages = messages.filter(msg => msg.role === 'user').length;
+  const avgResponseTime = messages.reduce((total, msg, i) => {
+    if (i === 0) return 0;
+    return total + (msg.timestamp - messages[i-1].timestamp);
+  }, 0) / (messages.length - 1);
+
+  if (userMessages > 5 && avgResponseTime < 60000) return 'High';
+  if (userMessages > 3 || avgResponseTime < 120000) return 'Medium';
+  return 'Low';
+};
+
+/**
+ * Generate recommended next steps based on conversation analysis
+ * @param {array} messages - Array of conversation messages
+ * @param {array} topics - Array of identified topics
+ * @param {array} concepts - Array of covered concepts
+ * @returns {array} - Array of recommended next steps
+ */
+const generateRecommendations = (messages, topics, concepts) => {
+  const recommendations = [];
+
+  // Add practice recommendation if concepts were covered
+  if (concepts.length > 0) {
+    recommendations.push(`Practice applying the concepts: ${concepts.slice(0, 2).join(', ')}`);
+  }
+
+  // Suggest exploring related topics
+  if (topics.length > 0) {
+    recommendations.push(`Explore related topics: ${topics.slice(0, 2).join(', ')}`);
+  }
+
+  // Add general recommendations
+  recommendations.push('Complete practice exercises to reinforce learning');
+  recommendations.push('Review key concepts from this session');
+  
+  return recommendations;
+};

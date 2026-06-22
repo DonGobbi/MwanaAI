@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="300" fill="#0369a1" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="50" cy="50" r="30" />
+    <circle cx="250" cy="50" r="20" />
+    <circle cx="50" cy="250" r="25" />
+    <circle cx="250" cy="250" r="15" />
+    <path d="M100,20 L200,20 L150,70 Z" />
+    <path d="M20,100 L20,200 L70,150 Z" />
+    <path d="M280,100 L280,200 L230,150 Z" />
+    <path d="M100,280 L200,280 L150,230 Z" />
+  </g>
+  
+  <!-- Person silhouette -->
+  <g transform="translate(150, 130)">
+    <!-- Head -->
+    <circle cx="0" cy="-60" r="40" fill="#ffffff" />
+    
+    <!-- Body -->
+    <path d="M-40,-20 C-40,20 -30,60 -60,100 L60,100 C30,60 40,20 40,-20 C40,-20 0,0 0,0 C0,0 -40,-20 -40,-20 Z" fill="#ffffff" />
+    
+    <!-- Tie -->
+    <path d="M0,0 L15,30 L0,100 L-15,30 Z" fill="#0ea5e9" />
+    
+    <!-- Suit details -->
+    <path d="M-40,-20 C-40,-20 -10,0 0,0 C10,0 40,-20 40,-20" fill="none" stroke="#0c4a6e" stroke-width="2" />
+  </g>
+  
+  <!-- Name -->
+  <rect x="75" y="240" width="150" height="40" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="265" font-family="Arial, sans-serif" font-weight="bold" font-size="16" text-anchor="middle" fill="#0c4a6e">John Banda</text>
+  <text x="150" y="280" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0c4a6e">Founder & CEO</text>
+</svg>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="250" fill="#0369a1"/>
+  <g fill="#FFFFFF">
+    <!-- Pi symbol -->
+    <path d="M170,80 h100 v15 h-15 v75 h-20 v-75 h-30 v75 h-20 v-75 h-15 v-15 z" />
+    <!-- Plus symbol -->
+    <path d="M120,125 h30 v-30 h20 v30 h30 v20 h-30 v30 h-20 v-30 h-30 z" />
+    <!-- Division symbol -->
+    <circle cx="250" cy="105" r="10" />
+    <rect x="220" y="125" width="60" height="10" />
+    <circle cx="250" cy="155" r="10" />
+  </g>
+  <text x="200" y="200" font-family="Arial, sans-serif" font-size="24" fill="#FFFFFF" text-anchor="middle">Mathematics</text>
+</svg>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="200" fill="#d97706" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="45" cy="45" r="20" />
+    <circle cx="255" cy="45" r="15" />
+    <circle cx="45" cy="155" r="15" />
+    <circle cx="255" cy="155" r="20" />
+    <path d="M65,35 L235,35 L150,65 Z" />
+    <path d="M35,65 L35,135 L65,100 Z" />
+    <path d="M265,65 L265,135 L235,100 Z" />
+    <path d="M65,165 L235,165 L150,135 Z" />
+  </g>
+  
+  <!-- Exam paper -->
+  <g transform="translate(150, 100)">
+    <!-- Paper -->
+    <rect x="-70" y="-80" width="140" height="160" fill="#f8fafc" />
+    
+    <!-- Header -->
+    <rect x="-70" y="-80" width="140" height="20" fill="#fef3c7" />
+    <text x="0" y="-67" font-family="Arial, sans-serif" font-weight="bold" font-size="10" text-anchor="middle" fill="#92400e">PHYSICS EXAMINATION</text>
+    
+    <!-- Lines -->
+    <line x1="-70" y1="-60" x2="70" y2="-60" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="-40" x2="70" y2="-40" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="-20" x2="70" y2="-20" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="0" x2="70" y2="0" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="20" x2="70" y2="20" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="40" x2="70" y2="40" stroke="#d1d5db" stroke-width="1" />
+    <line x1="-70" y1="60" x2="70" y2="60" stroke="#d1d5db" stroke-width="1" />
+    
+    <!-- Physics formulas and diagrams -->
+    <text x="-65" y="-50" font-family="Arial, sans-serif" font-size="8" fill="#1e293b">1. Calculate the force when:</text>
+    <text x="-60" y="-40" font-family="Arial, sans-serif" font-size="7" fill="#1e293b">F = ma, m = 5kg, a = 2m/s²</text>
+    
+    <!-- Force diagram -->
+    <g transform="translate(-40, -15)">
+      <line x1="0" y1="0" x2="30" y2="0" stroke="#1e293b" stroke-width="1" />
+      <polygon points="30,0 25,-3 25,3" fill="#1e293b" />
+      <text x="15" y="-5" font-family="Arial, sans-serif" font-size="6" text-anchor="middle" fill="#1e293b">F</text>
+    </g>
+    
+    <!-- Circuit diagram -->
+    <g transform="translate(30, -15)">
+      <circle cx="0" cy="0" r="10" fill="none" stroke="#1e293b" stroke-width="1" />
+      <line x1="-10" y1="0" x2="-20" y2="0" stroke="#1e293b" stroke-width="1" />
+      <line x1="10" y1="0" x2="20" y2="0" stroke="#1e293b" stroke-width="1" />
+      <line x1="-5" y1="-5" x2="5" y2="5" stroke="#1e293b" stroke-width="1" />
+      <line x1="-5" y1="5" x2="5" y2="-5" stroke="#1e293b" stroke-width="1" />
+    </g>
+    
+    <text x="-65" y="10" font-family="Arial, sans-serif" font-size="8" fill="#1e293b">2. Explain Newton's Third Law:</text>
+    <line x1="-60" y1="15" x2="60" y2="15" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="2,2" />
+    <line x1="-60" y1="25" x2="60" y2="25" stroke="#1e293b" stroke-width="0.5" stroke-dasharray="2,2" />
+    
+    <!-- Wave diagram -->
+    <g transform="translate(0, 50)">
+      <path d="M-60,0 C-45,-10 -30,10 -15,0 C0,-10 15,10 30,0 C45,-10 60,10 60,0" fill="none" stroke="#1e293b" stroke-width="1" />
+      <text x="0" y="15" font-family="Arial, sans-serif" font-size="6" text-anchor="middle" fill="#1e293b">Wavelength λ</text>
+    </g>
+  </g>
+  
+  <!-- Title -->
+  <rect x="50" y="150" width="200" height="30" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="170" font-family="Arial, sans-serif" font-weight="bold" font-size="14" text-anchor="middle" fill="#92400e">Physics Practice Exam</text>
+</svg>

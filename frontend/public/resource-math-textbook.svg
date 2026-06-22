@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="200" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="300" height="200" fill="#0369a1" />
+  
+  <!-- Abstract pattern background -->
+  <g opacity="0.1" fill="#ffffff">
+    <circle cx="30" cy="30" r="15" />
+    <circle cx="270" cy="30" r="10" />
+    <circle cx="30" cy="170" r="20" />
+    <circle cx="270" cy="170" r="15" />
+    <path d="M50,20 L250,20 L150,50 Z" />
+    <path d="M20,50 L20,150 L50,100 Z" />
+    <path d="M280,50 L280,150 L250,100 Z" />
+    <path d="M50,180 L250,180 L150,150 Z" />
+  </g>
+  
+  <!-- Book -->
+  <g transform="translate(150, 100)">
+    <!-- Book cover -->
+    <path d="M-60,-70 L60,-70 L60,70 L-60,70 Z" fill="#0ea5e9" />
+    <path d="M-60,-70 L-50,-70 L-50,70 L-60,70 Z" fill="#0284c7" />
+    
+    <!-- Book pages -->
+    <path d="M-50,-65 L55,-65 L55,65 L-50,65 Z" fill="#f8fafc" />
+    <path d="M-50,-65 L-45,-65 L-45,65 L-50,65 Z" fill="#e2e8f0" />
+    
+    <!-- Math symbols -->
+    <text x="0" y="-40" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">π</text>
+    <text x="-20" y="-10" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">÷</text>
+    <text x="20" y="-10" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">×</text>
+    <text x="-20" y="20" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">+</text>
+    <text x="20" y="20" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">−</text>
+    <text x="0" y="50" font-family="Arial, sans-serif" font-weight="bold" font-size="24" text-anchor="middle" fill="#0c4a6e">√</text>
+  </g>
+  
+  <!-- Title -->
+  <rect x="50" y="150" width="200" height="30" rx="5" fill="rgba(255,255,255,0.9)" />
+  <text x="150" y="170" font-family="Arial, sans-serif" font-weight="bold" font-size="14" text-anchor="middle" fill="#0c4a6e">Mathematics Textbook</text>
+</svg>

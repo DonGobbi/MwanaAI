@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="100" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="200" height="100" fill="#ffffff" rx="10" ry="10" />
+  
+  <!-- Logo elements -->
+  <g transform="translate(100, 50)">
+    <!-- Abstract logo shape -->
+    <polygon points="-30,-20 30,-20 40,0 30,20 -30,20 -40,0" fill="#7c3aed" />
+    
+    <!-- Globe icon -->
+    <circle cx="0" cy="0" r="15" fill="#ffffff" />
+    <ellipse cx="0" cy="0" rx="15" ry="7" fill="none" stroke="#7c3aed" stroke-width="1" />
+    <path d="M-15,0 L15,0 M0,-15 L0,15" stroke="#7c3aed" stroke-width="1" />
+    <path d="M-10,-5 C-5,-10 5,-10 10,-5 C5,0 -5,0 -10,-5 Z" fill="none" stroke="#7c3aed" stroke-width="1" />
+    <path d="M-10,5 C-5,10 5,10 10,5 C5,0 -5,0 -10,5 Z" fill="none" stroke="#7c3aed" stroke-width="1" />
+  </g>
+  
+  <!-- Company name -->
+  <text x="100" y="75" font-family="Arial, sans-serif" font-weight="bold" font-size="14" text-anchor="middle" fill="#5b21b6">Global Education Partners</text>
+</svg>
