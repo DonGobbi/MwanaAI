@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
+import Logo from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { GRADE_LEVELS } from '../config/curriculum';
 
@@ -135,16 +136,9 @@ const Signup = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/">
-          <img 
-            className="mx-auto h-12 w-auto" 
-            src="/logo.svg" 
-            alt="MwanaAI Logo"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = 'https://via.placeholder.com/120x40/0369a1/FFFFFF?text=MwanaAI';
-            }}
-          />
+        <Link to="/" className="flex items-center justify-center gap-2">
+          <Logo size={44} />
+          <span className="text-2xl font-bold font-display text-primary-700">MwanaAI</span>
         </Link>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Create your account

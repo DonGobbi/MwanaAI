@@ -205,7 +205,7 @@ const Quiz = () => {
               style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
           </div>
 
-          <div className="card p-6">
+          <div key={current} className="card p-6 animate-slide-in">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">{q.question}</h2>
             <div className="space-y-2">
               {q.options.map((opt, i) => (
@@ -255,9 +255,9 @@ const Quiz = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-xl">
-        <div className="card p-6 text-center mb-6">
+        <div className="card p-6 text-center mb-6 animate-fade-in-up">
           <p className="text-gray-500 text-sm">Your score</p>
-          <p className="text-4xl font-bold text-primary-600 my-1">{score}/{total}</p>
+          <p className="text-4xl font-bold text-primary-600 my-1 animate-pop">{score}/{total}</p>
           <p className="text-lg font-semibold text-gray-800">{percentage}%</p>
           <p className="text-gray-600 mt-2">{feedback}</p>
           <div className="flex flex-wrap justify-center gap-3 mt-5">
@@ -276,7 +276,7 @@ const Quiz = () => {
             const chosen = answers[i];
             const correct = q.correctIndex;
             return (
-              <div key={i} className="card p-4">
+              <div key={i} className="card p-4 animate-fade-in-up" style={{ animationDelay: `${i * 70}ms` }}>
                 <p className="font-medium text-gray-900 mb-2">{i + 1}. {q.question}</p>
                 <div className="space-y-1.5 mb-2">
                   {q.options.map((opt, oi) => {

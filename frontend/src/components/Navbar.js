@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from './Logo';
 import {
   FiBookOpen,
   FiMessageCircle,
@@ -34,9 +35,7 @@ const Navbar = () => {
       <div className="container">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-600 text-white font-bold font-display">
-              M
-            </span>
+            <Logo size={36} />
             <span className="text-xl font-bold font-display text-gray-900">MwanaAI</span>
           </Link>
 

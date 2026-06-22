@@ -127,9 +127,11 @@ const Learn = () => {
             </p>
 
             {loadingLesson ? (
-              <div className="py-10 text-center text-gray-500">Preparing your lesson…</div>
+              <div className="py-10 text-center text-gray-500 animate-fade-in">Preparing your lesson…</div>
             ) : (
-              <Markdown content={lesson} />
+              <div className="animate-fade-in">
+                <Markdown content={lesson} />
+              </div>
             )}
           </div>
 
@@ -221,7 +223,8 @@ const Learn = () => {
                 const done = completed.has(t.title);
                 return (
                   <button key={i} onClick={() => openLesson(t)}
-                    className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+                    style={{ animationDelay: `${i * 45}ms` }}
+                    className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 animate-fade-in-up">
                     <span className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       done ? 'bg-green-100 text-green-700' : 'bg-primary-100 text-primary-700'
                     }`}>
