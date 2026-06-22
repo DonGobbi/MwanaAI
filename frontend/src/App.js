@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AITutor from './pages/AITutor';
+import Learn from './pages/Learn';
 import Quiz from './pages/Quiz';
 import Progress from './pages/Progress';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -42,6 +43,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <AITutor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learn"
+            element={
+              <ProtectedRoute>
+                <Learn />
               </ProtectedRoute>
             }
           />

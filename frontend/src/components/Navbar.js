@@ -27,6 +27,12 @@ const Navbar = () => {
             {currentUser ? (
               <>
                 <Link
+                  to="/learn"
+                  className="text-gray-700 hover:text-primary-600 transition-colors font-medium"
+                >
+                  Learn
+                </Link>
+                <Link
                   to="/tutor"
                   className="text-gray-700 hover:text-primary-600 transition-colors font-medium"
                 >
@@ -34,7 +40,7 @@ const Navbar = () => {
                 </Link>
                 <Link
                   to="/quiz"
-                  className="text-gray-700 hover:text-primary-600 transition-colors font-medium"
+                  className="hidden sm:inline text-gray-700 hover:text-primary-600 transition-colors font-medium"
                 >
                   Practice
                 </Link>
