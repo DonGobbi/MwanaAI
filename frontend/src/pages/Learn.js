@@ -120,7 +120,7 @@ const Learn = () => {
             ← Back to topics
           </button>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="card p-6">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeTopic.title}</h1>
             <p className="text-sm text-gray-400 mb-4">
               {getSubject(subject)?.label} · {getGradeLevel(gradeLevel)?.label}
@@ -138,7 +138,7 @@ const Learn = () => {
               <button
                 onClick={completeTopic}
                 disabled={isDone}
-                className={`font-medium px-5 py-2 rounded-md ${
+                className={`font-medium px-5 py-2 rounded-lg ${
                   isDone
                     ? 'bg-green-100 text-green-700 cursor-default'
                     : 'bg-primary-600 hover:bg-primary-700 text-white'
@@ -146,10 +146,10 @@ const Learn = () => {
               >
                 {isDone ? '✓ Completed' : 'Mark as complete'}
               </button>
-              <Link to="/quiz" className="border border-primary-600 text-primary-700 hover:bg-primary-50 font-medium px-5 py-2 rounded-md">
+              <Link to="/quiz" className="border border-primary-600 text-primary-700 hover:bg-primary-50 font-medium px-5 py-2 rounded-lg">
                 Practice with a quiz
               </Link>
-              <Link to="/tutor" className="border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium px-5 py-2 rounded-md">
+              <Link to="/tutor" className="border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium px-5 py-2 rounded-lg">
                 Ask the tutor
               </Link>
             </div>
@@ -178,7 +178,7 @@ const Learn = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <select value={gradeLevel} onChange={handleGradeChange}
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
             <option value="">Select your class</option>
             <optgroup label="Primary">
               {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
@@ -193,14 +193,14 @@ const Learn = () => {
           </select>
 
           <select value={subject} onChange={handleSubjectChange}
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
             <option value="">Select a subject</option>
             {SUBJECTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
           </select>
         </div>
 
         <button onClick={loadTopics} disabled={loadingTopics}
-          className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium px-5 py-2 rounded-md mb-6">
+          className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium px-5 py-2 rounded-lg mb-6">
           {loadingTopics ? 'Loading topics…' : 'Show topics'}
         </button>
 
@@ -216,7 +216,7 @@ const Learn = () => {
               <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
             </div>
 
-            <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
+            <div className="card divide-y divide-gray-100">
               {topics.map((t, i) => {
                 const done = completed.has(t.title);
                 return (

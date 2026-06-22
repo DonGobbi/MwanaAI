@@ -314,13 +314,13 @@ const AITutor = () => {
           <div className="flex flex-shrink-0 gap-2">
             <button
               onClick={newChat}
-              className="text-sm bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md"
+              className="text-sm bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg"
             >
               + New chat
             </button>
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md"
+              className="text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg"
             >
               History{conversations.length ? ` (${conversations.length})` : ''}
             </button>
@@ -329,7 +329,7 @@ const AITutor = () => {
 
         {/* History panel */}
         {showHistory && (
-          <div className="bg-white rounded-lg shadow mb-4 max-h-64 overflow-y-auto">
+          <div className="card mb-4 max-h-64 overflow-y-auto">
             {conversations.length === 0 ? (
               <p className="text-sm text-gray-500 p-4">No saved chats yet.</p>
             ) : (
@@ -371,7 +371,7 @@ const AITutor = () => {
               id="grade"
               value={gradeLevel}
               onChange={handleGradeChange}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >
               <option value="">Select your class</option>
               <optgroup label="Primary">
@@ -395,7 +395,7 @@ const AITutor = () => {
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >
               <option value="">Select a subject</option>
               {SUBJECTS.map((s) => (
@@ -425,7 +425,7 @@ const AITutor = () => {
         )}
 
         {/* Chat window */}
-        <div className="bg-white rounded-lg shadow flex flex-col" style={{ height: '60vh' }}>
+        <div className="card flex flex-col" style={{ height: '60vh' }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
               <div
@@ -581,13 +581,13 @@ const AITutor = () => {
                   ? 'Type your question…'
                   : 'Choose your class and subject first…'
               }
-              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={!canSend}
-              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-md flex-shrink-0"
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-lg flex-shrink-0"
             >
               Send
             </button>

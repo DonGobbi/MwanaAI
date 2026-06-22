@@ -77,7 +77,7 @@ const Teacher = () => {
           <button onClick={() => setActive(null)} className="text-sm text-primary-600 hover:underline mb-4">
             ← Back to classes
           </button>
-          <div className="bg-white rounded-lg shadow p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="card p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{active.name}</h1>
               <p className="text-sm text-gray-500">{members.length} student{members.length !== 1 ? 's' : ''}</p>
@@ -92,11 +92,11 @@ const Teacher = () => {
           {loadingMembers ? (
             <p className="text-gray-500">Loading students…</p>
           ) : members.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-8 text-center text-gray-600">
+            <div className="card p-8 text-center text-gray-600">
               No students have joined yet. Share the code <span className="font-bold">{active.code}</span> with your class.
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="card overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                   <tr>
@@ -144,16 +144,16 @@ const Teacher = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Classes</h1>
         <p className="text-gray-600 text-sm mb-6">Create a class, share the code, and track your students' progress.</p>
 
-        <form onSubmit={createClass} className="bg-white rounded-lg shadow p-4 mb-6 flex gap-2">
+        <form onSubmit={createClass} className="card p-4 mb-6 flex gap-2">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="New class name (e.g. Form 2 Maths)"
-            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
           />
           <button type="submit" disabled={creating || !newName.trim()}
-            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-md">
+            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-lg">
             {creating ? 'Creating…' : 'Create'}
           </button>
         </form>
@@ -161,14 +161,14 @@ const Teacher = () => {
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : classes.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-600">
+          <div className="card p-8 text-center text-gray-600">
             You have no classes yet. Create your first one above.
           </div>
         ) : (
           <div className="space-y-3">
             {classes.map((c) => (
               <button key={c.id} onClick={() => openClass(c)}
-                className="w-full text-left bg-white rounded-lg shadow p-4 hover:shadow-md flex items-center justify-between">
+                className="w-full text-left card p-4 hover:shadow-md flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-gray-800">{c.name}</p>
                   <p className="text-xs text-gray-400">Created {new Date(c.createdAt).toLocaleDateString()}</p>

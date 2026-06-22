@@ -1,8 +1,19 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  FiBookOpen,
+  FiMessageCircle,
+  FiEdit3,
+  FiBarChart2,
+  FiUsers,
+  FiLogOut,
+} from 'react-icons/fi';
 
-const linkClass = 'text-gray-700 hover:text-primary-600 transition-colors font-medium';
+const navLink = ({ isActive }) =>
+  `inline-flex items-center gap-1.5 text-sm font-medium transition-colors ${
+    isActive ? 'text-primary-600' : 'text-gray-600 hover:text-primary-600'
+  }`;
 
 const Navbar = () => {
   const { currentUser, userProfile, logout } = useAuth();
@@ -19,42 +30,67 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
       <div className="container">
-        <div className="flex justify-between items-center py-4">
-          <Link to={currentUser ? '/' : '/'} className="flex items-center">
-            <span className="text-2xl font-bold text-primary-600">MwanaAI</span>
+        <div className="flex justify-between items-center h-16">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary-600 text-white font-bold font-display">
+              M
+            </span>
+            <span className="text-xl font-bold font-display text-gray-900">MwanaAI</span>
           </Link>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4 sm:gap-6">
             {currentUser ? (
               <>
                 {role === 'teacher' ? (
                   <>
-                    <Link to="/teacher" className={linkClass}>My Classes</Link>
-                    <Link to="/tutor" className={`hidden sm:inline ${linkClass}`}>Tutor</Link>
+                    <NavLink to="/teacher" className={navLink}>
+                      <FiUsers /> My Classes
+                    </NavLink>
+                    <NavLink to="/tutor" className={navLink}>
+                      <FiMessageCircle /> <span className="hidden sm:inline">Tutor</span>
+                    </NavLink>
                   </>
                 ) : role === 'parent' ? (
-                  <Link to="/child" className={linkClass}>My Child</Link>
+                  <NavLink to="/child" className={navLink}>
+                    <FiUsers /> My Child
+                  </NavLink>
                 ) : (
                   <>
-                    <Link to="/learn" className={linkClass}>Learn</Link>
-                    <Link to="/tutor" className={linkClass}>Tutor</Link>
-                    <Link to="/quiz" className={`hidden sm:inline ${linkClass}`}>Practice</Link>
-                    <Link to="/progress" className={`hidden sm:inline ${linkClass}`}>Progress</Link>
+                    <NavLink to="/learn" className={navLink}>
+                      <FiBookOpen /> <span className="hidden sm:inline">Learn</span>
+                    </NavLink>
+                    <NavLink to="/tutor" className={navLink}>
+                      <FiMessageCircle /> <span className="hidden sm:inline">Tutor</span>
+                    </NavLink>
+                    <NavLink to="/quiz" className={navLink}>
+                      <FiEdit3 /> <span className="hidden sm:inline">Practice</span>
+                    </NavLink>
+                    <NavLink to="/progress" className={`${navLink({ isActive: false })} hidden sm:inline-flex`}>
+                      <FiBarChart2 /> Progress
+                    </NavLink>
                   </>
                 )}
-                <span className="hidden md:inline text-sm text-gray-500">
-                  {currentUser.displayName ? currentUser.displayName.split(' ')[0] : 'Account'}
-                </span>
-                <button onClick={handleLogout} className="text-gray-700 hover:text-primary-600 transition-colors">
-                  Logout
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
+                  title="Log out"
+                >
+                  <FiLogOut /> <span className="hidden sm:inline">Logout</span>
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="text-gray-700 hover:text-primary-600 transition-colors">Login</Link>
-                <Link to="/signup" className="btn-primary">Sign Up</Link>
+                <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Sign Up
+                </Link>
               </>
             )}
           </div>

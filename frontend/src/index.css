@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,106 +6,55 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Fix for trembling/shaking issues */
+  background-color: #f8fafc;
+  color: #1f2937;
   overflow-x: hidden;
 }
 
-/* Global fix for trembling/shaking elements */
-* {
-  /* Disable transitions globally */
-  transition: none !important;
-  /* Force hardware acceleration */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  /* Prevent subpixel rendering issues */
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  /* Prevent layout shifts */
-  -webkit-perspective: 1000;
-  perspective: 1000;
+@layer base {
+  h1, h2, h3, h4, h5 {
+    font-family: 'Poppins', 'Inter', sans-serif;
+  }
+
+  /* Smooth interactions across the app (the old global transition:none is gone). */
+  a, button, select, input, textarea {
+    transition: color 0.15s ease, background-color 0.15s ease,
+      border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* stylelint-disable */
 @layer components {
-  /* Anti-trembling utilities */
-  .transform-gpu {
-    transform: translateZ(0);
-  }
-  
-  .backface-visibility-hidden {
-    backface-visibility: hidden;
-  }
-  
-  .will-change-transform {
-    will-change: transform;
-  }
-  
-  .text-shadow {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  }
-  
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-md transition-colors;
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
   }
-  
+
   .btn-secondary {
-    @apply bg-secondary-600 hover:bg-secondary-700 text-white font-medium py-2 px-4 rounded-md transition-colors;
+    @apply bg-secondary-600 hover:bg-secondary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
   }
-  
-  .container-custom {
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+
+  /* A reusable elevated card */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100;
   }
-  
-  /* Standard responsive container sizes */
-  @media (min-width: 640px) {
-    .container-custom {
-      max-width: 640px;
-      padding-left: 1.5rem;
-      padding-right: 1.5rem;
-    }
-  }
-  
-  @media (min-width: 768px) {
-    .container-custom {
-      max-width: 768px;
-    }
-  }
-  
-  @media (min-width: 1024px) {
-    .container-custom {
-      max-width: 1024px;
-      padding-left: 2rem;
-      padding-right: 2rem;
-    }
-  }
-  
-  @media (min-width: 1280px) {
-    .container-custom {
-      max-width: 1280px;
-    }
-  }
-  
-  @media (min-width: 1536px) {
-    .container-custom {
-      max-width: 1536px;
-    }
-  }
-  
-  .section-padding {
-    @apply py-12 md:py-16 lg:py-20;
-  }
+}
+
+/* Smooth, subtle scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

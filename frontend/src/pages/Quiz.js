@@ -126,11 +126,11 @@ const Quiz = () => {
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <div className="card p-6 space-y-4">
             <div>
               <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">Your class</label>
               <select id="grade" value={gradeLevel} onChange={handleGradeChange} disabled={loading}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                 <option value="">Select your class</option>
                 <optgroup label="Primary">
                   {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
@@ -148,7 +148,7 @@ const Quiz = () => {
             <div>
               <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
               <select id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={loading}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                 <option value="">Select a subject</option>
                 {SUBJECTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
               </select>
@@ -157,7 +157,7 @@ const Quiz = () => {
             <div>
               <label htmlFor="exam" className="block text-sm font-medium text-gray-700 mb-1">Exam style</label>
               <select id="exam" value={examType} onChange={(e) => setExamType(e.target.value)} disabled={loading}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                 {EXAM_TYPES.map((x) => (<option key={x.value} value={x.value}>{x.label}</option>))}
               </select>
             </div>
@@ -167,7 +167,7 @@ const Quiz = () => {
               <div className="flex gap-2">
                 {COUNTS.map((c) => (
                   <button key={c} type="button" onClick={() => setCount(c)} disabled={loading}
-                    className={`px-4 py-2 rounded-md border text-sm ${count === c ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                    className={`px-4 py-2 rounded-lg border text-sm ${count === c ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
                     {c}
                   </button>
                 ))}
@@ -175,7 +175,7 @@ const Quiz = () => {
             </div>
 
             <button onClick={startQuiz} disabled={loading}
-              className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-md">
+              className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg">
               {loading ? 'Generating your quiz…' : 'Start quiz'}
             </button>
           </div>
@@ -205,12 +205,12 @@ const Quiz = () => {
               style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="card p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">{q.question}</h2>
             <div className="space-y-2">
               {q.options.map((opt, i) => (
                 <button key={i} onClick={() => selectOption(i)}
-                  className={`w-full text-left px-4 py-3 rounded-md border text-sm transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
                     selected === i
                       ? 'bg-primary-50 border-primary-500 text-primary-800'
                       : 'border-gray-200 hover:bg-gray-50 text-gray-700'
@@ -228,12 +228,12 @@ const Quiz = () => {
               </button>
               {isLast ? (
                 <button onClick={finishQuiz} disabled={selected === null}
-                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-6 py-2 rounded-md">
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-6 py-2 rounded-lg">
                   Finish
                 </button>
               ) : (
                 <button onClick={() => setCurrent((c) => c + 1)} disabled={selected === null}
-                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-6 py-2 rounded-md">
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-6 py-2 rounded-lg">
                   Next →
                 </button>
               )}
@@ -255,16 +255,16 @@ const Quiz = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-xl">
-        <div className="bg-white rounded-lg shadow p-6 text-center mb-6">
+        <div className="card p-6 text-center mb-6">
           <p className="text-gray-500 text-sm">Your score</p>
           <p className="text-4xl font-bold text-primary-600 my-1">{score}/{total}</p>
           <p className="text-lg font-semibold text-gray-800">{percentage}%</p>
           <p className="text-gray-600 mt-2">{feedback}</p>
           <div className="flex flex-wrap justify-center gap-3 mt-5">
-            <button onClick={resetQuiz} className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-md">
+            <button onClick={resetQuiz} className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
               Take another quiz
             </button>
-            <Link to="/tutor" className="border border-primary-600 text-primary-700 hover:bg-primary-50 font-medium px-5 py-2 rounded-md">
+            <Link to="/tutor" className="border border-primary-600 text-primary-700 hover:bg-primary-50 font-medium px-5 py-2 rounded-lg">
               Ask the tutor for help
             </Link>
           </div>
@@ -276,7 +276,7 @@ const Quiz = () => {
             const chosen = answers[i];
             const correct = q.correctIndex;
             return (
-              <div key={i} className="bg-white rounded-lg shadow p-4">
+              <div key={i} className="card p-4">
                 <p className="font-medium text-gray-900 mb-2">{i + 1}. {q.question}</p>
                 <div className="space-y-1.5 mb-2">
                   {q.options.map((opt, oi) => {
@@ -284,7 +284,7 @@ const Quiz = () => {
                     const isChosen = oi === chosen;
                     return (
                       <div key={oi}
-                        className={`text-sm px-3 py-1.5 rounded-md border ${
+                        className={`text-sm px-3 py-1.5 rounded-lg border ${
                           isCorrect ? 'bg-green-50 border-green-300 text-green-800'
                           : isChosen ? 'bg-red-50 border-red-300 text-red-800'
                           : 'border-gray-100 text-gray-600'

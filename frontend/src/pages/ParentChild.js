@@ -59,17 +59,17 @@ const ParentChild = () => {
             e.preventDefault();
             lookup();
           }}
-          className="bg-white rounded-lg shadow p-4 mb-6 flex gap-2"
+          className="card p-4 mb-6 flex gap-2"
         >
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="child@example.com"
-            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
           />
           <button type="submit" disabled={loading}
-            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-md">
+            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-lg">
             {loading ? 'Loading…' : 'View'}
           </button>
         </form>
@@ -80,7 +80,7 @@ const ParentChild = () => {
 
         {child && summary && (
           <>
-            <div className="bg-white rounded-lg shadow p-5 mb-5">
+            <div className="card p-5 mb-5">
               <p className="font-semibold text-gray-800">{child.displayName || 'Student'}</p>
               <p className="text-xs text-gray-400 mb-4">{child.email}{child.gradeLevel ? '' : ''}</p>
               <div className="grid grid-cols-3 gap-3 text-center">
@@ -104,7 +104,7 @@ const ParentChild = () => {
             {summary.recent.length > 0 && (
               <>
                 <h2 className="text-lg font-bold text-gray-900 mb-2">Recent quizzes</h2>
-                <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
+                <div className="card divide-y divide-gray-100">
                   {summary.recent.map((r) => (
                     <div key={r.id} className="flex justify-between items-center px-4 py-3">
                       <div>

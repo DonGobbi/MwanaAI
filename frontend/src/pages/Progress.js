@@ -87,7 +87,7 @@ const Progress = () => {
         <p className="text-gray-600 text-sm mb-6">See how you're doing across your quizzes.</p>
 
         {/* My classes */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="card p-4 mb-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">My classes</h2>
           {myClasses.length > 0 ? (
             <ul className="mb-3 space-y-1">
@@ -107,10 +107,10 @@ const Progress = () => {
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="Enter class code"
               maxLength={6}
-              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase tracking-widest"
+              className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase tracking-widest"
             />
             <button type="submit" disabled={joining || !joinCode.trim()}
-              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-md">
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg">
               {joining ? 'Joining…' : 'Join'}
             </button>
           </form>
@@ -120,27 +120,27 @@ const Progress = () => {
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : totalQuizzes === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
+          <div className="card p-8 text-center">
             <p className="text-gray-600 mb-4">You haven't taken any quizzes yet.</p>
-            <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-md">
+            <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
               Take your first quiz
             </Link>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-5 text-center">
+              <div className="card p-5 text-center">
                 <p className="text-3xl font-bold text-primary-600">{totalQuizzes}</p>
                 <p className="text-sm text-gray-500">Quizzes taken</p>
               </div>
-              <div className="bg-white rounded-lg shadow p-5 text-center">
+              <div className="card p-5 text-center">
                 <p className="text-3xl font-bold text-primary-600">{avg}%</p>
                 <p className="text-sm text-gray-500">Average score</p>
               </div>
             </div>
 
             <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
-            <div className="bg-white rounded-lg shadow divide-y divide-gray-100 mb-6">
+            <div className="card divide-y divide-gray-100 mb-6">
               {subjectRows.map((s) => (
                 <div key={s.name} className="px-4 py-3">
                   <div className="flex justify-between text-sm mb-1">
@@ -158,7 +158,7 @@ const Progress = () => {
             </div>
 
             <h2 className="text-lg font-bold text-gray-900 mb-2">Recent quizzes</h2>
-            <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
+            <div className="card divide-y divide-gray-100">
               {results.slice(0, 20).map((r) => (
                 <div key={r.id} className="flex justify-between items-center px-4 py-3">
                   <div>
@@ -178,7 +178,7 @@ const Progress = () => {
             </div>
 
             <div className="text-center mt-6">
-              <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-md">
+              <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
                 Take another quiz
               </Link>
             </div>
