@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
 import { classService } from '../services/classService';
+import { aiInsights } from '../services/aiInsightsService';
+import { getGradeLevel } from '../config/curriculum';
 import EmptyState from '../components/EmptyState';
-import { FiBarChart2 } from 'react-icons/fi';
+import Markdown from '../components/Markdown';
+import { FiBarChart2, FiZap } from 'react-icons/fi';
 
 const Progress = () => {
   const { currentUser } = useAuth();
@@ -16,6 +19,10 @@ const Progress = () => {
   const [joinCode, setJoinCode] = useState('');
   const [joinMsg, setJoinMsg] = useState('');
   const [joining, setJoining] = useState(false);
+
+  // Smart study plan
+  const [studyPlan, setStudyPlan] = useState('');
+  const [loadingPlan, setLoadingPlan] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -62,6 +69,32 @@ const Progress = () => {
       setJoinMsg(err.message || 'Could not join. Check the code.');
     } finally {
       setJoining(false);
+    }
+  };
+
+  const getStudyPlan = async () => {
+    setLoadingPlan(true);
+    setStudyPlan('');
+    try {
+      const map = {};
+      results.forEach((r) => {
+        const k = r.subjectLabel || r.subject || 'Other';
+        if (!map[k]) map[k] = { sum: 0, n: 0 };
+        map[k].sum += r.percentage || 0;
+        map[k].n += 1;
+      });
+      const subjectScores = Object.entries(map).map(([subject, v]) => ({
+        subject,
+        avg: Math.round(v.sum / v.n),
+        count: v.n,
+      }));
+      const level = getGradeLevel(localStorage.getItem('mwanaai_grade_level'))?.label || 'school';
+      const plan = await aiInsights.studyPlan({ level, subjectScores });
+      setStudyPlan(plan);
+    } catch (err) {
+      setStudyPlan(`*${err.message || 'Could not build your study plan.'}*`);
+    } finally {
+      setLoadingPlan(false);
     }
   };
 
@@ -144,6 +177,29 @@ const Progress = () => {
                 <p className="text-3xl font-bold text-primary-600">{avg}%</p>
                 <p className="text-sm text-gray-500">Average score</p>
               </div>
+            </div>
+
+            {/* Smart study plan */}
+            <div className="card p-5 mb-6">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <FiZap className="text-primary-600" />
+                  <h2 className="font-bold text-gray-900">Smart Study Plan</h2>
+                </div>
+                <button onClick={getStudyPlan} disabled={loadingPlan}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {loadingPlan ? 'Thinking…' : studyPlan ? 'Refresh plan' : '✨ Get my study plan'}
+                </button>
+              </div>
+              {studyPlan ? (
+                <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
+                  <Markdown content={studyPlan} />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">
+                  Let MwanaAI look at your scores and build a personalised plan for what to study next.
+                </p>
+              )}
             </div>
 
             <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
