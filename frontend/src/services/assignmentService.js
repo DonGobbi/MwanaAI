@@ -43,10 +43,10 @@ export const assignmentService = {
     return all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
-  // How many students have completed an assignment.
+  // How many distinct students have completed an assignment.
   async completionCount(assignmentId) {
     const snap = await getDocs(query(collection(db, 'quiz_results'), where('assignmentId', '==', assignmentId)));
-    return snap.size;
+    return new Set(snap.docs.map((d) => d.data().userId)).size;
   },
 
   // Assignment submissions across a teacher's classes (optionally only newer
