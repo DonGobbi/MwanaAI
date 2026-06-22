@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
+import EmptyState from '../components/EmptyState';
+import { FiUsers } from 'react-icons/fi';
 
 function timeAgo(ts) {
   if (!ts) return 'never';
@@ -92,8 +94,13 @@ const Teacher = () => {
           {loadingMembers ? (
             <p className="text-gray-500">Loading students…</p>
           ) : members.length === 0 ? (
-            <div className="card p-8 text-center text-gray-600">
-              No students have joined yet. Share the code <span className="font-bold">{active.code}</span> with your class.
+            <div className="card p-6">
+              <EmptyState
+                compact
+                icon={FiUsers}
+                title="No students yet"
+                description={`Share the code ${active.code} with your class so students can join.`}
+              />
             </div>
           ) : (
             <div className="card overflow-hidden">
@@ -161,8 +168,12 @@ const Teacher = () => {
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : classes.length === 0 ? (
-          <div className="card p-8 text-center text-gray-600">
-            You have no classes yet. Create your first one above.
+          <div className="card p-6">
+            <EmptyState
+              icon={FiUsers}
+              title="No classes yet"
+              description="Create your first class above, then share its code with your students."
+            />
           </div>
         ) : (
           <div className="space-y-3">

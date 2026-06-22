@@ -12,6 +12,8 @@ import {
   SpeechRecognitionCtor,
 } from '../utils/speech';
 import Markdown from '../components/Markdown';
+import EmptyState from '../components/EmptyState';
+import { FiMessageSquare } from 'react-icons/fi';
 
 const WELCOME = {
   id: 'welcome',
@@ -331,7 +333,12 @@ const AITutor = () => {
         {showHistory && (
           <div className="card mb-4 max-h-64 overflow-y-auto">
             {conversations.length === 0 ? (
-              <p className="text-sm text-gray-500 p-4">No saved chats yet.</p>
+              <EmptyState
+                compact
+                icon={FiMessageSquare}
+                title="No saved chats yet"
+                description="Your conversations will appear here so you can pick up where you left off."
+              />
             ) : (
               <ul className="divide-y divide-gray-100">
                 {conversations.map((c) => (

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
 import { classService } from '../services/classService';
+import EmptyState from '../components/EmptyState';
+import { FiBarChart2 } from 'react-icons/fi';
 
 const Progress = () => {
   const { currentUser } = useAuth();
@@ -120,11 +122,16 @@ const Progress = () => {
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : totalQuizzes === 0 ? (
-          <div className="card p-8 text-center">
-            <p className="text-gray-600 mb-4">You haven't taken any quizzes yet.</p>
-            <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
-              Take your first quiz
-            </Link>
+          <div className="card p-6">
+            <EmptyState
+              icon={FiBarChart2}
+              title="No quizzes yet"
+              description="Take your first quiz and your scores and subject breakdown will appear here."
+            >
+              <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
+                Take your first quiz
+              </Link>
+            </EmptyState>
           </div>
         ) : (
           <>

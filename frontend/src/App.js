@@ -32,11 +32,13 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function AppRoutes() {
+  const location = useLocation();
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-grow">
-        <Routes>
+        <div key={location.pathname} className="page-transition">
+        <Routes location={location}>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -91,6 +93,7 @@ function AppRoutes() {
           {/* Anything else goes home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </div>
       </main>
       <Footer />
     </div>
