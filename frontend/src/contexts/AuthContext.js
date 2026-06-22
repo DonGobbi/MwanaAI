@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import firebaseService from '../services/firebaseService';
+import { PageLoader } from '../components/Spinner';
 
 const GRADE_LEVEL_KEY = 'mwanaai_grade_level';
 
@@ -181,7 +182,13 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? (
+        <div className="flex justify-center items-center h-screen">
+          <PageLoader label="Starting MwanaAI…" />
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
