@@ -128,10 +128,12 @@ const Home = () => {
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   useEffect(() => {
-    if (currentUser && role === 'student' && !localStorage.getItem(ONBOARDED_KEY)) {
+    // Only for confirmed students (userProfile loaded) so teachers/parents
+    // never see the student onboarding while their profile is still loading.
+    if (currentUser && userProfile?.userType === 'student' && !localStorage.getItem(ONBOARDED_KEY)) {
       setShowOnboarding(true);
     }
-  }, [currentUser, role]);
+  }, [currentUser, userProfile]);
 
   // ---- Logged-in dashboard ----
   if (currentUser) {

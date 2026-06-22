@@ -137,3 +137,10 @@ code {
 .dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.16) !important; }
 .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.16) !important; }
 .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.16) !important; }
+
+/* Keep brand-coloured text readable on dark surfaces */
+.dark .text-primary-600 { color: #38bdf8 !important; }
+.dark .text-primary-700,
+.dark .text-primary-800 { color: #7dd3fc !important; }
+.dark .text-green-800 { color: #86efac !important; }
+.dark .text-red-800 { color: #fca5a5 !important; }
