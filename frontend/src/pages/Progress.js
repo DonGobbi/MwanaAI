@@ -8,6 +8,8 @@ import { getGradeLevel } from '../config/curriculum';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
 import Leaderboard from '../components/Leaderboard';
+import Badges from '../components/Badges';
+import { computeBadges } from '../utils/badges';
 import { FiBarChart2, FiZap } from 'react-icons/fi';
 
 // Current run of consecutive active days (based on quiz dates).
@@ -40,6 +42,24 @@ const Progress = () => {
   // Smart study plan
   const [studyPlan, setStudyPlan] = useState('');
   const [loadingPlan, setLoadingPlan] = useState(false);
+
+  // Lessons completed (for streak/badge calculations)
+  const [lessonsCompleted, setLessonsCompleted] = useState(0);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!currentUser) return;
+      try {
+        const s = await classService.getStudentSummary(currentUser.uid);
+        if (active) setLessonsCompleted(s.lessonsCompleted);
+      } catch (err) {
+        /* ignore */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     let active = true;
@@ -132,6 +152,15 @@ const Progress = () => {
     .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.total), count: v.total }))
     .sort((a, b) => b.avg - a.avg);
 
+  const badges = computeBadges({
+    quizCount: totalQuizzes,
+    avgScore: avg,
+    perfectCount: results.filter((r) => r.percentage === 100).length,
+    streak: computeStreak(results),
+    lessonsCompleted,
+    subjectStats: subjectRows,
+  });
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-2xl">
@@ -199,6 +228,8 @@ const Progress = () => {
                 <p className="text-sm text-gray-500">Day streak</p>
               </div>
             </div>
+
+            <Badges badges={badges} />
 
             {myClasses[0] && (
               <Leaderboard

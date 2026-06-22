@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { classService } from '../services/classService';
+import { printStudentReport } from '../utils/printReport';
+import { FiPrinter } from 'react-icons/fi';
 
 const STORAGE_KEY = 'mwanaai_child_email';
 
@@ -81,8 +83,27 @@ const ParentChild = () => {
         {child && summary && (
           <>
             <div className="card p-5 mb-5">
-              <p className="font-semibold text-gray-800">{child.displayName || 'Student'}</p>
-              <p className="text-xs text-gray-400 mb-4">{child.email}{child.gradeLevel ? '' : ''}</p>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="font-semibold text-gray-800">{child.displayName || 'Student'}</p>
+                  <p className="text-xs text-gray-400">{child.email}</p>
+                </div>
+                <button
+                  onClick={() =>
+                    printStudentReport({
+                      name: child.displayName || 'Student',
+                      email: child.email,
+                      quizzes: summary.quizCount,
+                      avg: summary.avgScore,
+                      lessons: summary.lessonsCompleted,
+                      results: summary.recent,
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <FiPrinter /> Print
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-2xl font-bold text-primary-600">{summary.quizCount}</p>

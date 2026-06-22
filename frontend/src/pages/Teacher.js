@@ -6,8 +6,9 @@ import { aiInsights } from '../services/aiInsightsService';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
+import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2, FiClipboard } from 'react-icons/fi';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter } from 'react-icons/fi';
 
 function timeAgo(ts) {
   if (!ts) return 'never';
@@ -291,7 +292,25 @@ const StudentDetail = ({ member, onBack }) => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-3xl">
-        <button onClick={onBack} className="text-sm text-primary-600 hover:underline mb-4">← Back to class</button>
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={onBack} className="text-sm text-primary-600 hover:underline">← Back to class</button>
+          <button
+            onClick={() =>
+              printStudentReport({
+                name: member.studentName,
+                email: member.studentEmail,
+                quizzes: results.length,
+                avg,
+                lessons: member.summary?.lessonsCompleted ?? 0,
+                subjectRows,
+                results,
+              })
+            }
+            className="inline-flex items-center gap-1.5 text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <FiPrinter /> Print report
+          </button>
+        </div>
 
         <div className="card p-5 mb-5">
           <h1 className="text-2xl font-bold text-gray-900">{member.studentName}</h1>
