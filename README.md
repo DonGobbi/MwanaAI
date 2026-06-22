@@ -1,110 +1,163 @@
-# MwanaAI — Personal AI Tutor 🇲🇼
+# MwanaAI — AI Learning Platform 🇲🇼
 
-MwanaAI is an AI-powered personal tutor for students in Malawi. A student picks
-their **class/form level** and **subject**, then asks anything they're stuck on —
-the tutor explains step by step, in language pitched at their level. They can
-even snap a **photo of their homework** and get help with it.
+MwanaAI is an AI-powered learning platform for students in Malawi. It started as
+a personal tutor and has grown into a full learning loop — **Learn → Practice →
+Get help → Track progress** — with dashboards for **students, teachers and
+parents**, all aligned to the Malawi curriculum (Standard 1–8 / Form 1–4).
 
-The goal is simple: make it feel like a patient, encouraging human tutor — not a
-wall of text.
+The goal: make learning feel like a patient, encouraging human tutor — and give
+teachers and parents real tools to support each student.
 
-## Features
+---
 
-- **AI tutor that adapts to the student** — explanations are tailored to the
-  student's level (Standard 1–8 / Form 1–4) and subject.
-- **Step-by-step help** — guides the student through the working so they learn,
-  instead of just dumping answers.
-- **Homework photo upload** 📷 — snap a picture of your work and the tutor (a
-  vision model) reads it and helps.
-- **Quick actions** — one tap for *Explain more simply*, *Another example*,
-  *Practice question*, *Quiz me*, or *Study tips*.
-- **Readable answers** — responses are formatted (bold terms, numbered steps,
-  bullet points), not a tiring block of text.
-- **Safety built in** — every question is screened by Meta's **Llama Prompt
-  Guard 2** for prompt-injection / jailbreak attempts before it reaches the tutor.
-- **Accounts** — students sign up and log in (Firebase Auth); their class level
-  is saved to their profile.
+## ✨ Features
 
-## Tech stack
+### For students
+- **AI Tutor** — ask anything and get step-by-step help pitched at your class
+  level. Supports:
+  - 📷 **Homework photo upload** — snap a picture of your work and a vision model
+    reads it and helps.
+  - 🎤 **Voice** — speak your question and 🔊 listen to answers read aloud.
+  - 💾 **Save & resume** chats.
+  - Quick actions (*explain simply*, *another example*, *quiz me*, …).
+- **Guided lessons** — pick a subject and get a syllabus-ordered list of topics,
+  each taught as a full lesson; mark topics complete and watch a progress bar.
+- **Adaptive quizzes & exam prep** — auto-marked multiple-choice quizzes by
+  subject, with **PSLCE / JCE / MSCE** exam styles. An **Adaptive** mode tunes
+  difficulty to your past scores, and **AI feedback** tells you exactly what to
+  review after each quiz.
+- **Smart Study Plan** — AI reads your quiz performance and builds a personalised
+  plan for what to study next.
+- **Progress & motivation** — scores by subject, 🔥 **day streaks**, a class
+  **leaderboard**, and **achievement badges**.
+- **Assignments** — see tasks set by your teachers and complete them in one tap.
 
-- **Frontend:** React (Create React App), React Router, Tailwind CSS
-- **Auth:** Firebase Authentication + Firestore (student profiles)
+### For teachers
+- **AI Lesson Planner** — generate a ready-to-teach lesson plan (objectives,
+  activities, assessment, homework) for any topic — and **assign a matching quiz
+  to a class in one click**.
+- **Classes** — create a class, share a join code, and see a roster with each
+  student's quizzes, average, lessons and last-active.
+- **AI Class Insights** — an AI summary of how a class is doing, who needs help,
+  and what to teach next.
+- **Per-student view** — drill into one student's full history with an AI
+  recommendation on how to support them.
+- **Assignments** — set a quiz task per class and track completion.
+- **Notifications** — a bell shows new submissions since you last checked.
+- **Printable reports** — print or save a PDF report for any student.
+
+### For parents
+- **Child progress** — look up your child by email to see their stats and recent
+  quizzes, and **print a report**.
+
+### Throughout
+- **Roles** (student / teacher / parent) with a role-aware dashboard and nav.
+- **First-run onboarding** for new students.
+- **Dark mode**, polished UI, page transitions, and an AI safety layer
+  (**Llama Prompt Guard 2** screens every tutor question).
+
+---
+
+## 🛠 Tech stack
+
+- **Frontend:** React (Create React App), React Router, Tailwind CSS, react-icons
+- **Auth & data:** Firebase Authentication + Cloud Firestore
 - **AI:** [Groq](https://groq.com) API
-  - Tutoring: `llama-3.1-8b-instant`
-  - Homework images: `meta-llama/llama-4-scout-17b-16e-instruct` (vision)
+  - Tutoring, quizzes, lessons & insights: `llama-3.3-70b-versatile`
+    (falls back to `llama-3.1-8b-instant` when rate-limited)
+  - Homework images (vision): `meta-llama/llama-4-scout-17b-16e-instruct`
   - Safety: `meta-llama/llama-prompt-guard-2-86m`
-- **Backend (optional):** Node.js + Express (not required for the core tutor)
+- **Backend (optional):** Node.js + Express (the core app talks to Groq/Firebase
+  directly and does not require it)
+- **Containers:** Docker + Docker Compose
 
-## Project structure
+---
+
+## 📁 Project structure
 
 ```
 MwanaAI_Project/
-├── frontend/                  # React app (the main application)
+├── frontend/                    # React app (the main application)
 │   └── src/
-│       ├── pages/             # Home, Login, Signup, AITutor
-│       ├── components/        # Navbar, Footer, Markdown renderer, ...
-│       ├── services/          # aiTutoring, promptGuard, firebaseService
-│       ├── contexts/          # AuthContext
-│       ├── config/            # firebase.js, curriculum.js (levels + subjects)
-│       └── utils/             # image.js (downscale homework photos)
-└── backend/                   # Express API (optional)
+│       ├── pages/               # Home, Login, Signup, AITutor, Learn, Quiz,
+│       │                        #   Progress, Teacher, ParentChild
+│       ├── components/          # Navbar, Logo, Markdown, EmptyState, Badges,
+│       │                        #   Leaderboard, NotificationBell, Onboarding…
+│       ├── services/            # aiTutoring, quizService, lessonService,
+│       │                        #   classService, assignmentService,
+│       │                        #   aiInsightsService, promptGuard, groqClient…
+│       ├── contexts/            # AuthContext
+│       ├── config/              # firebase.js, curriculum.js (levels/subjects/exams)
+│       └── utils/               # image, speech, badges, printReport
+├── backend/                     # Express API (optional)
+├── firestore.rules             # Firestore security rules
+└── docker-compose.yml          # Run frontend + backend in containers
 ```
 
-## Getting started
+---
+
+## 🚀 Getting started
 
 ### Prerequisites
-
-- [Node.js](https://nodejs.org) v16 or later
+- [Node.js](https://nodejs.org) v16+ (or Docker)
 - A free [Groq API key](https://console.groq.com/keys)
+- A [Firebase](https://console.firebase.google.com) project (Auth + Firestore)
 
 ### 1. Clone
-
 ```bash
 git clone https://github.com/DonGobbi/MwanaAI.git
 cd MwanaAI
 ```
 
-### 2. Run the frontend (the main app)
+### 2. Configure the frontend
+```bash
+cd frontend
+cp .env.example .env.local
+```
+Edit `frontend/.env.local` with your keys:
+```
+REACT_APP_GROQ_API_KEY=gsk_your_real_key_here
+REACT_APP_FIREBASE_API_KEY=...
+REACT_APP_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=your-project-id
+REACT_APP_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=...
+REACT_APP_FIREBASE_APP_ID=...
+```
 
+### 3. Run it
+
+**Option A — npm**
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local      # then edit .env.local and add your Groq key
-npm start
+npm start            # http://localhost:3000
 ```
 
-Open http://localhost:3000.
-
-Your `.env.local` should contain:
-
-```
-REACT_APP_GROQ_API_KEY=gsk_your_real_key_here
-```
-
-### 3. Run the backend (optional)
-
-The core tutor talks to Groq directly and does **not** need the backend. To run
-it anyway:
-
+**Option B — Docker** (runs frontend + backend together)
 ```bash
-cd backend
-npm install
-cp .env.example .env            # development mode uses a mock Firebase
-npm run dev                     # http://localhost:5000
+docker compose up --build
+# frontend → http://localhost:3000   backend → http://localhost:5000
 ```
 
-## Notes
+### 4. Firebase setup (one-time)
+1. **Authentication → Sign-in method →** enable **Email/Password**.
+2. **Firestore Database → Rules →** paste the contents of
+   [`firestore.rules`](firestore.rules) and **Publish**.
 
-- **Firebase:** the frontend uses a configured Firebase project for login. Make
-  sure **Email/Password** sign-in is enabled in the Firebase console. The
-  Firebase *web* config in `frontend/src/config/firebase.js` is a public client
-  identifier (protected by Firebase security rules), not a secret.
-- **API key & production:** for local development the Groq key lives in
-  `.env.local` and is bundled into the frontend. For a public deployment, proxy
-  Groq calls through the backend so the key stays server-side.
-- **Secrets:** `.env*` files and service-account keys are git-ignored. Never
-  commit real keys — copy the `.env.example` templates instead.
+That's it — sign up as a student (you'll get an onboarding flow) and start
+learning, or sign up as a teacher to create classes and assignments.
+
+---
+
+## 🔒 Notes on security
+- **Firebase web config** values are public client identifiers (protected by
+  Firestore security rules and API key restrictions), not secrets.
+- **The Groq key** is bundled into the frontend for local development. For a
+  public deployment, proxy Groq calls through the backend so the key stays
+  server-side.
+- `.env*` files and service-account keys are git-ignored — never commit real
+  keys; copy the `.env.example` templates instead.
 
 ## License
-
 Released under the [MIT License](LICENSE).
