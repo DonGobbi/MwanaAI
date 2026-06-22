@@ -1,141 +1,110 @@
-# MwanaAI - AI-Powered Learning Platform
+# MwanaAI — Personal AI Tutor 🇲🇼
 
-MwanaAI is an educational platform designed to provide AI-powered learning experiences tailored to Malawi's curriculum. The platform offers interactive learning tools, resources, and personalized tutoring to enhance educational outcomes for students.
+MwanaAI is an AI-powered personal tutor for students in Malawi. A student picks
+their **class/form level** and **subject**, then asks anything they're stuck on —
+the tutor explains step by step, in language pitched at their level. They can
+even snap a **photo of their homework** and get help with it.
 
-## Project Structure
-
-```
-MwanaAI_Project/
-├── frontend/                # React frontend application
-│   ├── public/              # Static assets
-│   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/           # Page components
-│   │   ├── assets/          # Images, icons, etc.
-│   │   ├── styles/          # Global styles
-│   │   ├── utils/           # Utility functions
-│   │   ├── App.js           # Main application component
-│   │   └── index.js         # Entry point
-│   ├── package.json         # Frontend dependencies
-│   └── tailwind.config.js   # Tailwind CSS configuration
-└── backend/                 # Backend services (to be implemented)
-```
+The goal is simple: make it feel like a patient, encouraging human tutor — not a
+wall of text.
 
 ## Features
 
-- **AI Tutor**: Interactive AI-powered tutoring aligned with Malawi's curriculum
-- **Dashboard**: Personalized student dashboard with progress tracking
-- **Resources**: Educational materials including textbooks, worksheets, and videos
-- **Profile Management**: User profile and account settings
-- **Responsive Design**: Mobile-friendly interface for accessibility
+- **AI tutor that adapts to the student** — explanations are tailored to the
+  student's level (Standard 1–8 / Form 1–4) and subject.
+- **Step-by-step help** — guides the student through the working so they learn,
+  instead of just dumping answers.
+- **Homework photo upload** 📷 — snap a picture of your work and the tutor (a
+  vision model) reads it and helps.
+- **Quick actions** — one tap for *Explain more simply*, *Another example*,
+  *Practice question*, *Quiz me*, or *Study tips*.
+- **Readable answers** — responses are formatted (bold terms, numbered steps,
+  bullet points), not a tiring block of text.
+- **Safety built in** — every question is screened by Meta's **Llama Prompt
+  Guard 2** for prompt-injection / jailbreak attempts before it reaches the tutor.
+- **Accounts** — students sign up and log in (Firebase Auth); their class level
+  is saved to their profile.
 
-## Pages
+## Tech stack
 
-### Home
-Landing page introducing MwanaAI with features, benefits, and testimonials.
+- **Frontend:** React (Create React App), React Router, Tailwind CSS
+- **Auth:** Firebase Authentication + Firestore (student profiles)
+- **AI:** [Groq](https://groq.com) API
+  - Tutoring: `llama-3.1-8b-instant`
+  - Homework images: `meta-llama/llama-4-scout-17b-16e-instruct` (vision)
+  - Safety: `meta-llama/llama-prompt-guard-2-86m`
+- **Backend (optional):** Node.js + Express (not required for the core tutor)
 
-### Dashboard
-User dashboard displaying:
-- Course progress
-- Recent activities
-- Upcoming assignments
-- Recommended courses
-- Quick links
+## Project structure
 
-### AI Tutor
-Interactive learning assistant with:
-- Subject and topic selection
-- Chat interface for questions
-- Suggested questions based on selected topics
-- Study settings and learning tools
-
-### Resources
-Educational materials organized by:
-- Categories (textbooks, worksheets, videos, etc.)
-- Search functionality
-- Featured resources
-- Resource request form
-
-### Profile
-User profile management with:
-- Personal information
-- Account settings
-- Learning preferences
-- Notification settings
-- Privacy and security options
-
-## Getting Started
-
-### Prerequisites
-- Node.js (v14.x or later)
-- npm or yarn
-
-### Installation
-
-1. Clone the repository
-```bash
-git clone https://github.com/yourusername/MwanaAI_Project.git
-cd MwanaAI_Project
+```
+MwanaAI_Project/
+├── frontend/                  # React app (the main application)
+│   └── src/
+│       ├── pages/             # Home, Login, Signup, AITutor
+│       ├── components/        # Navbar, Footer, Markdown renderer, ...
+│       ├── services/          # aiTutoring, promptGuard, firebaseService
+│       ├── contexts/          # AuthContext
+│       ├── config/            # firebase.js, curriculum.js (levels + subjects)
+│       └── utils/             # image.js (downscale homework photos)
+└── backend/                   # Express API (optional)
 ```
 
-2. Install frontend dependencies
+## Getting started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org) v16 or later
+- A free [Groq API key](https://console.groq.com/keys)
+
+### 1. Clone
+
+```bash
+git clone https://github.com/DonGobbi/MwanaAI.git
+cd MwanaAI
+```
+
+### 2. Run the frontend (the main app)
+
 ```bash
 cd frontend
 npm install
-```
-
-3. Start the development server
-```bash
+cp .env.example .env.local      # then edit .env.local and add your Groq key
 npm start
 ```
 
-4. Open your browser and navigate to `http://localhost:3000`
+Open http://localhost:3000.
 
-## Development Guidelines
+Your `.env.local` should contain:
 
-### Component Structure
-- Use functional components with hooks
-- Create reusable components in the `components/` directory
-- Keep page components in the `pages/` directory
+```
+REACT_APP_GROQ_API_KEY=gsk_your_real_key_here
+```
 
-### Styling
-- Use Tailwind CSS for styling
-- Follow the design system defined in `tailwind.config.js`
-- Use the predefined utility classes for consistency
+### 3. Run the backend (optional)
 
-### State Management
-- Use React Context API for global state
-- Use local state (useState) for component-specific state
-- Consider Redux for more complex state management needs
+The core tutor talks to Groq directly and does **not** need the backend. To run
+it anyway:
 
-### Code Quality
-- Follow ESLint rules
-- Write meaningful comments
-- Use descriptive variable and function names
+```bash
+cd backend
+npm install
+cp .env.example .env            # development mode uses a mock Firebase
+npm run dev                     # http://localhost:5000
+```
 
-## Future Enhancements
+## Notes
 
-- Backend API integration
-- Authentication and user management
-- Real-time AI tutoring
-- Offline access via mobile app
-- Analytics dashboard for learning progress
-- Content management system for educators
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- **Firebase:** the frontend uses a configured Firebase project for login. Make
+  sure **Email/Password** sign-in is enabled in the Firebase console. The
+  Firebase *web* config in `frontend/src/config/firebase.js` is a public client
+  identifier (protected by Firebase security rules), not a secret.
+- **API key & production:** for local development the Groq key lives in
+  `.env.local` and is bundled into the frontend. For a public deployment, proxy
+  Groq calls through the backend so the key stays server-side.
+- **Secrets:** `.env*` files and service-account keys are git-ignored. Never
+  commit real keys — copy the `.env.example` templates instead.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Malawi Ministry of Education for curriculum guidance
-- Contributors and developers
-- Educational content partners
+Released under the [MIT License](LICENSE).
