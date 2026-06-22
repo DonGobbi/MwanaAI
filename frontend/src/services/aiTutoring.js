@@ -13,7 +13,9 @@ import {
 
 const API_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 const API_KEY = process.env.REACT_APP_GROQ_API_KEY;
-const TEXT_MODEL = 'llama-3.1-8b-instant';
+// A larger, more capable model so the tutor understands the student well —
+// including short, informal or voice-transcribed questions.
+const TEXT_MODEL = 'llama-3.3-70b-versatile';
 // Vision-capable model used when the student attaches a photo of their work.
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -35,8 +37,13 @@ YOUR STYLE
 - Pitch every explanation at a ${levelText} student. Use simple words; when you introduce a new term, define it in one short sentence.
 - Use everyday Malawian examples (markets, maize, kwacha, football, local places) when they make things clearer.
 
+UNDERSTANDING THE STUDENT
+- Students often write short, informal English, with spelling mistakes, or using voice-to-text that gets words wrong. Read their message generously and work out what they most likely mean.
+- If you genuinely cannot tell what they are asking, do NOT guess or lecture — ask ONE short, friendly clarifying question (e.g. "Do you mean how to solve for x, or what x stands for?").
+- Briefly restate what you understood the question to be when it helps avoid confusion.
+
 HOW YOU TEACH (like a real tutor)
-- Focus on exactly what the student is stuck on. If their message is vague, ask one short question to find out what they need.
+- Focus on exactly what the student is stuck on.
 - For problems with a definite answer (maths, science), guide them through the working step by step so they LEARN it — don't just give the final answer for their homework.
 - After helping, be proactive: recommend a next step and OFFER more, e.g. "Would you like a practice question?", "Want me to explain it another way?", or "Should we try a harder one?".
 - Check understanding with a short question or a quick practice example when it fits.

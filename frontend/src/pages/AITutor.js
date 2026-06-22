@@ -1,25 +1,31 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { aiTutoring } from '../services/aiTutoring';
+import { conversationService } from '../services/conversationService';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
 import { fileToDownscaledDataUrl } from '../utils/image';
+import {
+  speak,
+  cancelSpeech,
+  ttsSupported,
+  sttSupported,
+  SpeechRecognitionCtor,
+} from '../utils/speech';
 import Markdown from '../components/Markdown';
 
 const WELCOME = {
   id: 'welcome',
   role: 'assistant',
   content:
-    "Hi! I'm your MwanaAI tutor. 👋\n\nChoose your **class** and **subject** above, then tell me what you're working on. You can:\n\n- Ask me to explain something you don't understand\n- Send a **photo of your homework** and I'll help\n- Ask for a **practice question** or a quick quiz\n\nWhat would you like to start with?",
+    "Hi! I'm your MwanaAI tutor. 👋\n\nChoose your **class** and **subject** above, then tell me what you're working on. You can:\n\n- Ask me to explain something you don't understand\n- Send a **photo of your homework** and I'll help\n- Tap the 🎤 to talk, or 🔊 to hear my answers\n\nWhat would you like to start with?",
 };
 
-// Suggestions shown before the conversation starts.
 const STARTERS = [
   'Explain a topic I am learning',
   'Help me with my homework',
   'Give me a practice question',
 ];
 
-// Tutor-like quick actions shown once we're chatting.
 const QUICK_ACTIONS = [
   { label: 'Explain more simply', prompt: 'Please explain that again in a simpler way.' },
   { label: 'Another example', prompt: 'Can you show me another example?' },
@@ -32,8 +38,16 @@ const QUICK_ACTIONS = [
   { label: 'Study tips', prompt: 'Give me a few short study tips for this topic.' },
 ];
 
+function deriveTitle(msgs) {
+  const firstUser = msgs.find((m) => m.role === 'user' && (m.content || m.image || m.hasImage));
+  if (!firstUser) return 'New chat';
+  const t = (firstUser.content || '').trim();
+  if (!t) return 'Homework help';
+  return t.length > 42 ? `${t.slice(0, 42)}…` : t;
+}
+
 const AITutor = () => {
-  const { userProfile, updateGradeLevel } = useAuth();
+  const { currentUser, userProfile, updateGradeLevel } = useAuth();
 
   const [gradeLevel, setGradeLevel] = useState('');
   const [subject, setSubject] = useState('');
@@ -42,8 +56,22 @@ const AITutor = () => {
   const [attachedImage, setAttachedImage] = useState(null);
   const [attaching, setAttaching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Voice
+  const [speakingId, setSpeakingId] = useState(null);
+  const [listening, setListening] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // History
+  const [conversations, setConversations] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const conversationIdRef = useRef(null);
+  const createdAtRef = useRef(null);
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Initialise the class from the student's saved profile / local cache.
   useEffect(() => {
@@ -55,6 +83,48 @@ const AITutor = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Stop any speech when leaving the page.
+  useEffect(() => () => cancelSpeech(), []);
+
+  const loadConversations = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      setConversations(await conversationService.list(currentUser.uid));
+    } catch (err) {
+      console.error('Could not load conversations:', err);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Auto-save the current conversation (debounced) whenever it changes.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!messages.some((m) => m.role === 'user')) return;
+    const timer = setTimeout(async () => {
+      try {
+        const id = await conversationService.save(currentUser.uid, {
+          id: conversationIdRef.current,
+          title: deriveTitle(messages),
+          subject,
+          gradeLevel,
+          messages,
+          createdAt: createdAtRef.current || Date.now(),
+        });
+        if (!conversationIdRef.current) {
+          conversationIdRef.current = id;
+          createdAtRef.current = createdAtRef.current || Date.now();
+        }
+        loadConversations();
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [messages, currentUser, subject, gradeLevel, loadConversations]);
 
   const handleGradeChange = (e) => {
     const value = e.target.value;
@@ -79,13 +149,12 @@ const AITutor = () => {
       return;
     }
 
-    // Text history sent to the model (exclude welcome/hint bubbles & empties).
     const history = messages
       .filter(
         (m) =>
           m.content &&
           (m.role === 'user' ||
-            (m.role === 'assistant' && m.id !== 'welcome' && !m.id.startsWith('hint')))
+            (m.role === 'assistant' && m.id !== 'welcome' && !String(m.id).startsWith('hint')))
       )
       .map((m) => ({ role: m.role, content: m.content }));
 
@@ -106,7 +175,12 @@ const AITutor = () => {
         context: history,
         image,
       });
-      pushAssistant(reply);
+      const id = `a-${Date.now()}`;
+      setMessages((prev) => [...prev, { id, role: 'assistant', content: reply }]);
+      if (autoRead && reply) {
+        setSpeakingId(id);
+        speak(reply, { onend: () => setSpeakingId(null) });
+      }
     } catch (error) {
       console.error('Tutor error:', error);
       pushAssistant(
@@ -127,7 +201,7 @@ const AITutor = () => {
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
-    if (e.target) e.target.value = ''; // allow re-selecting the same file
+    if (e.target) e.target.value = '';
     if (!file) return;
     try {
       setAttaching(true);
@@ -140,21 +214,152 @@ const AITutor = () => {
     }
   };
 
+  // --- Voice ---
+  const handleSpeak = (msg) => {
+    if (speakingId === msg.id) {
+      cancelSpeech();
+      setSpeakingId(null);
+      return;
+    }
+    setSpeakingId(msg.id);
+    speak(msg.content, { onend: () => setSpeakingId(null) });
+  };
+
+  const toggleListening = () => {
+    if (!sttSupported) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const rec = new SpeechRecognitionCtor();
+    // en-GB tends to match Malawian/East-African English better than en-US.
+    rec.lang = 'en-GB';
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (event) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInputValue(transcript);
+    };
+    // When listening stops, focus the box so the student can read, fix any
+    // mis-heard words, and press Send when happy — nothing is sent automatically.
+    rec.onend = () => {
+      setListening(false);
+      inputRef.current?.focus();
+    };
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
+  // --- History ---
+  const newChat = () => {
+    cancelSpeech();
+    setSpeakingId(null);
+    setMessages([WELCOME]);
+    setInputValue('');
+    setAttachedImage(null);
+    conversationIdRef.current = null;
+    createdAtRef.current = null;
+    setShowHistory(false);
+  };
+
+  const loadConversation = (convo) => {
+    cancelSpeech();
+    setSpeakingId(null);
+    const loaded = (convo.messages || []).map((m, i) => ({
+      id: `m-${i}`,
+      role: m.role,
+      content: m.content,
+      hasImage: m.hasImage,
+    }));
+    setMessages([WELCOME, ...loaded]);
+    if (convo.subject) setSubject(convo.subject);
+    if (convo.gradeLevel) setGradeLevel(convo.gradeLevel);
+    conversationIdRef.current = convo.id;
+    createdAtRef.current = convo.createdAt || null;
+    setShowHistory(false);
+  };
+
+  const deleteConversation = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await conversationService.remove(id);
+      if (conversationIdRef.current === id) newChat();
+      loadConversations();
+    } catch (err) {
+      console.error('Could not delete conversation:', err);
+    }
+  };
+
   const ready = gradeLevel && subject;
   const hasConversation = messages.some(
-    (m) => m.role === 'assistant' && m.id !== 'welcome' && !m.id.startsWith('hint')
+    (m) => m.role === 'assistant' && m.id !== 'welcome' && !String(m.id).startsWith('hint')
   );
   const canSend = ready && !isLoading && (inputValue.trim() || attachedImage);
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-6 max-w-3xl">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">MwanaAI Tutor</h1>
-          <p className="text-gray-600 text-sm">
-            Your personal AI tutor — ask anything, or send a photo of your homework.
-          </p>
+        <div className="flex items-start justify-between mb-4 gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">MwanaAI Tutor</h1>
+            <p className="text-gray-600 text-sm">
+              Ask anything, talk with the 🎤, send a photo of your homework, or listen with 🔊.
+            </p>
+          </div>
+          <div className="flex flex-shrink-0 gap-2">
+            <button
+              onClick={newChat}
+              className="text-sm bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md"
+            >
+              + New chat
+            </button>
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className="text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md"
+            >
+              History{conversations.length ? ` (${conversations.length})` : ''}
+            </button>
+          </div>
         </div>
+
+        {/* History panel */}
+        {showHistory && (
+          <div className="bg-white rounded-lg shadow mb-4 max-h-64 overflow-y-auto">
+            {conversations.length === 0 ? (
+              <p className="text-sm text-gray-500 p-4">No saved chats yet.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {conversations.map((c) => (
+                  <li
+                    key={c.id}
+                    onClick={() => loadConversation(c)}
+                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{c.title}</p>
+                      <p className="text-xs text-gray-400">
+                        {getSubject(c.subject)?.label || c.subject || 'General'} ·{' '}
+                        {c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => deleteConversation(e, c.id)}
+                      className="text-gray-300 hover:text-red-500 text-xl leading-none px-2 flex-shrink-0"
+                      aria-label="Delete chat"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {/* Class + Subject pickers */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -200,8 +405,27 @@ const AITutor = () => {
           </div>
         </div>
 
+        {/* Auto-read toggle */}
+        {ttsSupported && (
+          <label className="flex items-center gap-2 mb-2 text-sm text-gray-600 select-none">
+            <input
+              type="checkbox"
+              checked={autoRead}
+              onChange={(e) => {
+                setAutoRead(e.target.checked);
+                if (!e.target.checked) {
+                  cancelSpeech();
+                  setSpeakingId(null);
+                }
+              }}
+              className="rounded text-primary-600 focus:ring-primary-500"
+            />
+            🔊 Read answers aloud automatically
+          </label>
+        )}
+
         {/* Chat window */}
-        <div className="bg-white rounded-lg shadow flex flex-col" style={{ height: '62vh' }}>
+        <div className="bg-white rounded-lg shadow flex flex-col" style={{ height: '60vh' }}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
               <div
@@ -223,10 +447,34 @@ const AITutor = () => {
                     />
                   )}
                   {message.role === 'assistant' ? (
-                    <Markdown content={message.content} />
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <Markdown content={message.content} />
+                      </div>
+                      {ttsSupported && message.id !== 'welcome' && (
+                        <button
+                          onClick={() => handleSpeak(message)}
+                          className="flex-shrink-0 text-gray-400 hover:text-primary-600 mt-0.5"
+                          title={speakingId === message.id ? 'Stop' : 'Listen'}
+                          aria-label="Listen to answer"
+                        >
+                          {speakingId === message.id ? (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <rect x="5" y="5" width="10" height="10" rx="1" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 5.343a1 1 0 011.414 0A7.97 7.97 0 0118 10a7.97 7.97 0 01-1.929 4.657 1 1 0 11-1.414-1.414A5.98 5.98 0 0016 10a5.98 5.98 0 00-1.343-3.243 1 1 0 010-1.414z" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ) : (
-                    message.content && (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    (message.content || message.hasImage) && (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {message.content || '📷 Photo'}
+                      </p>
                     )
                   )}
                 </div>
@@ -250,17 +498,18 @@ const AITutor = () => {
           {/* Suggestions / quick actions */}
           {ready && !isLoading && (
             <div className="px-4 pb-2 flex flex-wrap gap-2">
-              {(hasConversation ? QUICK_ACTIONS.map((a) => a) : STARTERS.map((s) => ({ label: s, prompt: s }))).map(
-                (action) => (
-                  <button
-                    key={action.label}
-                    onClick={() => askTutor(action.prompt)}
-                    className="text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 px-3 py-1 rounded-full"
-                  >
-                    {action.label}
-                  </button>
-                )
-              )}
+              {(hasConversation
+                ? QUICK_ACTIONS
+                : STARTERS.map((s) => ({ label: s, prompt: s }))
+              ).map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => askTutor(action.prompt)}
+                  className="text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 px-3 py-1 rounded-full"
+                >
+                  {action.label}
+                </button>
+              ))}
             </div>
           )}
 
@@ -287,13 +536,7 @@ const AITutor = () => {
 
           {/* Input row */}
           <form onSubmit={handleSubmit} className="border-t border-gray-200 p-3 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -307,11 +550,37 @@ const AITutor = () => {
                   d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
               </svg>
             </button>
+
+            {sttSupported && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                disabled={isLoading}
+                title={listening ? 'Stop listening' : 'Speak your question'}
+                aria-label="Speak your question"
+                className={`flex-shrink-0 p-2 rounded-full disabled:opacity-50 ${
+                  listening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-gray-500 hover:text-primary-600'
+                }`}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 11a7 7 0 01-14 0m7 7v3m0-3a4 4 0 01-4-4V7a4 4 0 118 0v4a4 4 0 01-4 4z" />
+                </svg>
+              </button>
+            )}
+
             <input
+              ref={inputRef}
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={ready ? 'Type your question…' : 'Choose your class and subject first…'}
+              placeholder={
+                listening
+                  ? 'Listening… speak now'
+                  : ready
+                  ? 'Type your question…'
+                  : 'Choose your class and subject first…'
+              }
               className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
               disabled={isLoading}
             />
