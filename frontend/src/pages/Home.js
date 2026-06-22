@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
+import Onboarding, { ONBOARDED_KEY } from '../components/Onboarding';
 import {
   FiBookOpen,
   FiMessageCircle,
@@ -125,10 +126,18 @@ const Home = () => {
   const role = userProfile?.userType || 'student';
   const firstName = currentUser?.displayName ? currentUser.displayName.split(' ')[0] : '';
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (currentUser && role === 'student' && !localStorage.getItem(ONBOARDED_KEY)) {
+      setShowOnboarding(true);
+    }
+  }, [currentUser, role]);
+
   // ---- Logged-in dashboard ----
   if (currentUser) {
     return (
       <div className="min-h-screen">
+        {showOnboarding && <Onboarding onClose={() => setShowOnboarding(false)} />}
         <div className="container py-8 max-w-4xl">
           {/* Welcome banner */}
           <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm">

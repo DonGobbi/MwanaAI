@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { aiTutoring } from '../services/aiTutoring';
 import { conversationService } from '../services/conversationService';
 import { useAuth } from '../contexts/AuthContext';
@@ -74,6 +75,9 @@ const AITutor = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
+  const location = useLocation();
+  const pendingQuestionRef = useRef(null);
+  const onboardingHandledRef = useRef(false);
 
   // Initialise the class from the student's saved profile / local cache.
   useEffect(() => {
@@ -296,6 +300,28 @@ const AITutor = () => {
       console.error('Could not delete conversation:', err);
     }
   };
+
+  // Prefill class/subject and queue the first question coming from onboarding.
+  useEffect(() => {
+    const st = location.state;
+    if (st && st.fromOnboarding && !onboardingHandledRef.current) {
+      onboardingHandledRef.current = true;
+      if (st.gradeLevel) setGradeLevel(st.gradeLevel);
+      if (st.subject) setSubject(st.subject);
+      if (st.question) pendingQuestionRef.current = st.question;
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
+  // Once class + subject are set, auto-send the queued onboarding question.
+  useEffect(() => {
+    if (pendingQuestionRef.current && gradeLevel && subject && !isLoading) {
+      const q = pendingQuestionRef.current;
+      pendingQuestionRef.current = null;
+      askTutor(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeLevel, subject]);
 
   const ready = gradeLevel && subject;
   const hasConversation = messages.some(
