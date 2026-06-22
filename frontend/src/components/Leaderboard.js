@@ -67,7 +67,7 @@ const Leaderboard = ({ classId, className, meId }) => {
         {top.map((r, i) => <Row key={r.id} r={r} i={i} />)}
         {myIndex >= 5 && <Row r={rows[myIndex]} i={myIndex} />}
       </ul>
-      <p className="text-xs text-gray-400 mt-2">Points = your quiz scores added up. Take more quizzes to climb! 🚀</p>
+      <p className="text-xs text-gray-400 mt-2">Points come from your quiz scores — do more quizzes and score higher to climb! 🚀</p>
     </div>
   );
 };

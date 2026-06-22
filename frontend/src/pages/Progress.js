@@ -152,14 +152,16 @@ const Progress = () => {
     .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.total), count: v.total }))
     .sort((a, b) => b.avg - a.avg);
 
+  const streak = computeStreak(results);
   const badges = computeBadges({
     quizCount: totalQuizzes,
     avgScore: avg,
     perfectCount: results.filter((r) => r.percentage === 100).length,
-    streak: computeStreak(results),
+    streak,
     lessonsCompleted,
     subjectStats: subjectRows,
   });
+  const hasActivity = totalQuizzes > 0 || lessonsCompleted > 0;
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -198,6 +200,9 @@ const Progress = () => {
           {joinMsg && <p className="text-xs text-gray-500 mt-2">{joinMsg}</p>}
         </div>
 
+        {/* Achievements show whenever there is any activity (quizzes or lessons) */}
+        {!loading && hasActivity && <Badges badges={badges} />}
+
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : totalQuizzes === 0 ? (
@@ -224,12 +229,10 @@ const Progress = () => {
                 <p className="text-sm text-gray-500">Average</p>
               </div>
               <div className="card p-5 text-center">
-                <p className="text-3xl font-bold text-amber-500">🔥 {computeStreak(results)}</p>
+                <p className="text-3xl font-bold text-amber-500">🔥 {streak}</p>
                 <p className="text-sm text-gray-500">Day streak</p>
               </div>
             </div>
-
-            <Badges badges={badges} />
 
             {myClasses[0] && (
               <Leaderboard
