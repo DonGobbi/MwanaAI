@@ -17,14 +17,34 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
-// AI Lesson Planner — generate a ready-to-use lesson plan for any topic.
-const LessonPlanner = () => {
+// AI Lesson Planner — generate a ready-to-use lesson plan for any topic,
+// and assign a matching quiz to a class in one click.
+const LessonPlanner = ({ classes, teacher }) => {
   const [subject, setSubject] = useState('');
   const [level, setLevel] = useState('form-2');
   const [topic, setTopic] = useState('');
   const [plan, setPlan] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [assignClass, setAssignClass] = useState('');
+  const [assignMsg, setAssignMsg] = useState('');
+
+  const assignQuiz = async () => {
+    const cls = (classes || []).find((c) => c.id === assignClass);
+    if (!cls) return;
+    setAssignMsg('');
+    try {
+      await assignmentService.create(teacher, cls, {
+        subject,
+        subjectLabel: getSubject(subject)?.label || subject,
+        topic: topic.trim(),
+        count: 5,
+      });
+      setAssignMsg(`Assigned to ${cls.name} ✓`);
+    } catch (err) {
+      setAssignMsg('Could not assign.');
+    }
+  };
 
   const generate = async () => {
     setError('');
@@ -78,6 +98,22 @@ const LessonPlanner = () => {
         className="bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
         {loading ? 'Generating…' : 'Generate lesson plan'}
       </button>
+
+      {classes && classes.length > 0 && subject && topic.trim() && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-500">Assign a 5-question quiz on this topic:</span>
+          <select value={assignClass} onChange={(e) => setAssignClass(e.target.value)}
+            className="rounded-lg border-gray-300 shadow-sm text-xs py-1 focus:border-primary-500 focus:ring-primary-500">
+            <option value="">Choose class</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button onClick={assignQuiz} disabled={!assignClass}
+            className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1 rounded-lg transition-colors">
+            Assign
+          </button>
+          {assignMsg && <span className="text-xs text-green-600">{assignMsg}</span>}
+        </div>
+      )}
 
       {plan && (
         <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
@@ -378,7 +414,7 @@ const Teacher = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Teacher Tools</h1>
         <p className="text-gray-600 text-sm mb-6">Plan lessons with AI, create classes, and track your students.</p>
 
-        <LessonPlanner />
+        <LessonPlanner classes={classes} teacher={currentUser} />
 
         <form onSubmit={createClass} className="card p-4 mb-4 flex gap-2">
           <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}

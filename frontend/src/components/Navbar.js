@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 import {
   FiBookOpen,
   FiMessageCircle,
@@ -42,6 +43,7 @@ const Navbar = () => {
 
           <div className="flex items-center gap-4 sm:gap-6">
             <ThemeToggle />
+            {currentUser && role === 'student' && <NotificationBell />}
             {currentUser ? (
               <>
                 {role === 'teacher' ? (

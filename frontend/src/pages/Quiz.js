@@ -191,6 +191,14 @@ const Quiz = () => {
     }
   };
 
+  // Automatically generate feedback as soon as the quiz is finished.
+  useEffect(() => {
+    if (phase === 'done' && !feedback && !loadingFeedback && questions.length) {
+      getFeedback();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   const resetQuiz = () => {
     assignmentRef.current = null;
     setPhase('setup');
@@ -378,6 +386,8 @@ const Quiz = () => {
             <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
               <Markdown content={feedback} />
             </div>
+          ) : loadingFeedback ? (
+            <p className="text-sm text-gray-500 mt-2">Analysing your answers…</p>
           ) : (
             <p className="text-sm text-gray-500 mt-2">
               Get a personalised note on exactly which topics to review based on what you missed.
