@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// MwanaAI Firestore security rules.
+//
+// Apply these in the Firebase console:
+//   Firestore Database > Rules > paste > Publish.
+// Or with the Firebase CLI: `firebase deploy --only firestore:rules`.
+//
+// Model: every user can write only their OWN data. Progress data
+// (quiz results, lesson completion) and user profiles are readable by any
+// signed-in user so that teachers can see their class rosters and parents can
+// see their child's progress.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // User profiles — readable by signed-in users (rosters, parent lookup);
+    // writable only by the owner.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Saved tutor conversations — private to the owner.
+    match /conversations/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Quiz results — readable by any signed-in user (teachers/parents view
+    // progress); writable only by the owner.
+    match /quiz_results/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Lesson completion — same policy as quiz results.
+    match /lesson_progress/{id} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Classes — anyone signed in can read (to find a class by code); only the
+    // owning teacher can create/modify.
+    match /classes/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // Class membership — students add/remove only their own membership;
+    // any signed-in user can read (teacher rosters).
+    match /class_members/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.studentId == request.auth.uid;
+    }
+  }
+}

@@ -9,6 +9,8 @@ import AITutor from './pages/AITutor';
 import Learn from './pages/Learn';
 import Quiz from './pages/Quiz';
 import Progress from './pages/Progress';
+import Teacher from './pages/Teacher';
+import ParentChild from './pages/ParentChild';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Protected route component
@@ -67,6 +69,22 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <Progress />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher"
+            element={
+              <ProtectedRoute>
+                <Teacher />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/child"
+            element={
+              <ProtectedRoute>
+                <ParentChild />
               </ProtectedRoute>
             }
           />

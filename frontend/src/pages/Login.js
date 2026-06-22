@@ -70,8 +70,8 @@ const Login = () => {
       // This is especially important for fast operations
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // If login is successful, go straight to the AI tutor
-      navigate('/tutor');
+      // Go to the home dashboard, which shows the right tools for the role.
+      navigate('/');
     } catch (err) {
       setIsLoading(false);
       setError(err.message || 'Invalid email or password. Please try again.');

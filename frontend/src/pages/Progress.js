@@ -1,12 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
+import { classService } from '../services/classService';
 
 const Progress = () => {
   const { currentUser } = useAuth();
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Classes the student has joined
+  const [myClasses, setMyClasses] = useState([]);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinMsg, setJoinMsg] = useState('');
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -26,13 +33,42 @@ const Progress = () => {
     };
   }, [currentUser]);
 
+  const loadClasses = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      setMyClasses(await classService.listClassesForStudent(currentUser.uid));
+    } catch (err) {
+      console.error('Could not load classes:', err);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadClasses();
+  }, [loadClasses]);
+
+  const joinClass = async (e) => {
+    e.preventDefault();
+    if (!joinCode.trim() || !currentUser) return;
+    setJoining(true);
+    setJoinMsg('');
+    try {
+      const cls = await classService.joinClass(currentUser, joinCode);
+      setJoinMsg(`Joined "${cls.name}" ✓`);
+      setJoinCode('');
+      loadClasses();
+    } catch (err) {
+      setJoinMsg(err.message || 'Could not join. Check the code.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const totalQuizzes = results.length;
   const avg =
     totalQuizzes > 0
       ? Math.round(results.reduce((a, r) => a + (r.percentage || 0), 0) / totalQuizzes)
       : 0;
 
-  // Average score per subject — highlights strong and weak subjects.
   const bySubject = {};
   results.forEach((r) => {
     const key = r.subjectLabel || r.subject || 'Other';
@@ -50,6 +86,37 @@ const Progress = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Progress</h1>
         <p className="text-gray-600 text-sm mb-6">See how you're doing across your quizzes.</p>
 
+        {/* My classes */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">My classes</h2>
+          {myClasses.length > 0 ? (
+            <ul className="mb-3 space-y-1">
+              {myClasses.map((c) => (
+                <li key={c.id} className="text-sm text-gray-700">
+                  • {c.className} <span className="text-gray-400">({c.teacherName})</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500 mb-3">You haven't joined a class yet.</p>
+          )}
+          <form onSubmit={joinClass} className="flex gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="Enter class code"
+              maxLength={6}
+              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase tracking-widest"
+            />
+            <button type="submit" disabled={joining || !joinCode.trim()}
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-md">
+              {joining ? 'Joining…' : 'Join'}
+            </button>
+          </form>
+          {joinMsg && <p className="text-xs text-gray-500 mt-2">{joinMsg}</p>}
+        </div>
+
         {loading ? (
           <p className="text-gray-500">Loading…</p>
         ) : totalQuizzes === 0 ? (
@@ -61,7 +128,6 @@ const Progress = () => {
           </div>
         ) : (
           <>
-            {/* Summary */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-white rounded-lg shadow p-5 text-center">
                 <p className="text-3xl font-bold text-primary-600">{totalQuizzes}</p>
@@ -73,7 +139,6 @@ const Progress = () => {
               </div>
             </div>
 
-            {/* Per subject */}
             <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
             <div className="bg-white rounded-lg shadow divide-y divide-gray-100 mb-6">
               {subjectRows.map((s) => (
@@ -92,7 +157,6 @@ const Progress = () => {
               ))}
             </div>
 
-            {/* History */}
             <h2 className="text-lg font-bold text-gray-900 mb-2">Recent quizzes</h2>
             <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
               {results.slice(0, 20).map((r) => (
