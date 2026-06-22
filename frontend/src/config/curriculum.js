@@ -32,6 +32,14 @@ export const SUBJECTS = [
   { value: 'life-skills', label: 'Life Skills' },
 ];
 
+// Malawi national examinations.
+export const EXAM_TYPES = [
+  { value: '', label: 'General practice' },
+  { value: 'PSLCE', label: 'PSLCE — Primary School Leaving Certificate' },
+  { value: 'JCE', label: 'JCE — Junior Certificate of Education' },
+  { value: 'MSCE', label: 'MSCE — Malawi School Certificate of Education' },
+];
+
 export function getGradeLevel(value) {
   return GRADE_LEVELS.find((g) => g.value === value) || null;
 }

@@ -32,7 +32,19 @@ const Navbar = () => {
                 >
                   Tutor
                 </Link>
-                <span className="hidden sm:inline text-sm text-gray-500">
+                <Link
+                  to="/quiz"
+                  className="text-gray-700 hover:text-primary-600 transition-colors font-medium"
+                >
+                  Practice
+                </Link>
+                <Link
+                  to="/progress"
+                  className="hidden sm:inline text-gray-700 hover:text-primary-600 transition-colors font-medium"
+                >
+                  Progress
+                </Link>
+                <span className="hidden md:inline text-sm text-gray-500">
                   {currentUser.displayName
                     ? currentUser.displayName.split(' ')[0]
                     : 'Student'}

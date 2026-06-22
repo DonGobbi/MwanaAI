@@ -6,6 +6,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AITutor from './pages/AITutor';
+import Quiz from './pages/Quiz';
+import Progress from './pages/Progress';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Protected route component
@@ -40,6 +42,22 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <AITutor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz"
+            element={
+              <ProtectedRoute>
+                <Quiz />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/progress"
+            element={
+              <ProtectedRoute>
+                <Progress />
               </ProtectedRoute>
             }
           />
