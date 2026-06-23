@@ -19,6 +19,8 @@ import {
   FiAward,
   FiClipboard,
   FiTrendingUp,
+  FiFolder,
+  FiUserCheck,
 } from 'react-icons/fi';
 
 const STUDENT_CARDS = [
@@ -317,6 +319,131 @@ const DashboardCard = ({ to, icon: Icon, title, text, color }) => (
   </Link>
 );
 
+const Banner = ({ firstName, subtitle, children }) => (
+  <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
+      <p className="text-primary-50 mt-1">{subtitle}</p>
+    </div>
+    {children}
+  </div>
+);
+
+// Data-rich teacher dashboard.
+const TeacherHome = ({ firstName }) => {
+  const { currentUser } = useAuth();
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!currentUser) return;
+      try {
+        const classes = await classService.listClassesForTeacher(currentUser.uid);
+        const ids = classes.map((c) => c.id);
+        const memberLists = await Promise.all(ids.map((id) => classService.getMembers(id)));
+        const students = new Set(memberLists.flat().map((m) => m.studentId)).size;
+        const submissions = (await assignmentService.teacherSubmissions(ids, 0)).length;
+        if (active) setData({ classes, students, submissions });
+      } catch (err) {
+        console.error('Could not load teacher dashboard:', err);
+        if (active) setData({ classes: [], students: 0, submissions: 0 });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
+  const d = data || { classes: [], students: 0, submissions: 0 };
+
+  return (
+    <>
+      <Banner firstName={firstName} subtitle="Manage your classes and track your students." />
+
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <StatTile icon={FiFolder} value={d.classes.length} label="Classes" color="bg-sky-100 text-sky-600" />
+        <StatTile icon={FiUsers} value={d.students} label="Students" color="bg-violet-100 text-violet-600" />
+        <StatTile icon={FiClipboard} value={d.submissions} label="Submissions" color="bg-amber-100 text-amber-600" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <DashboardCard to="/teacher" icon={FiUsers} title="My Classes" text="Create classes, plan lessons and track student progress." color="bg-sky-100 text-sky-600" />
+        <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
+      </div>
+
+      {d.classes.length > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-gray-900">Your classes</h2>
+            <Link to="/teacher" className="text-sm text-primary-600 hover:underline">Open</Link>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {d.classes.map((c) => (
+              <li key={c.id} className="flex items-center justify-between py-2">
+                <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                <span className="text-sm font-bold tracking-widest text-primary-600">{c.code}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+};
+
+// Data-rich parent dashboard — shows the linked child's key stats up front.
+const ParentHome = ({ firstName }) => {
+  const [child, setChild] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const email = localStorage.getItem('mwanaai_child_email');
+      if (!email) {
+        if (active) setLoading(false);
+        return;
+      }
+      try {
+        const found = await classService.findStudentByEmail(email);
+        if (found) {
+          const summary = await classService.getStudentSummary(found.uid);
+          if (active) setChild({ name: found.displayName || 'Your child', summary });
+        }
+      } catch (err) {
+        console.error('Could not load child:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <>
+      <Banner firstName={firstName} subtitle="Follow your child's learning progress." />
+
+      {!loading && child && (
+        <>
+          <p className="text-sm text-gray-500 mb-2">{child.name}'s progress</p>
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <StatTile icon={FiEdit3} value={child.summary.quizCount} label="Quizzes" color="bg-sky-100 text-sky-600" />
+            <StatTile icon={FiTrendingUp} value={child.summary.avgScore == null ? '—' : `${child.summary.avgScore}%`} label="Average" color="bg-emerald-100 text-emerald-600" />
+            <StatTile icon={FiBookOpen} value={child.summary.lessonsCompleted} label="Lessons" color="bg-violet-100 text-violet-600" />
+          </div>
+        </>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <DashboardCard to="/child" icon={FiUserCheck} title="My Child" text={child ? "See full progress and print a report." : "Enter your child's email to see their progress."} color="bg-emerald-100 text-emerald-600" />
+      </div>
+    </>
+  );
+};
+
 const Home = () => {
   const { currentUser, userProfile } = useAuth();
   const role = userProfile?.userType || 'student';
@@ -336,26 +463,9 @@ const Home = () => {
         {showOnboarding && <Onboarding onClose={() => setShowOnboarding(false)} />}
         <div className="container py-8 max-w-4xl">
           {role === 'teacher' ? (
-            <>
-              <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm">
-                <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
-                <p className="text-primary-50 mt-1">Manage your classes and track your students.</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DashboardCard to="/teacher" icon={FiUsers} title="My Classes" text="Create classes, plan lessons and track student progress." color="bg-sky-100 text-sky-600" />
-                <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
-              </div>
-            </>
+            <TeacherHome firstName={firstName} />
           ) : role === 'parent' ? (
-            <>
-              <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm">
-                <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
-                <p className="text-primary-50 mt-1">Follow your child's learning progress.</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DashboardCard to="/child" icon={FiUsers} title="My Child" text="View your child's progress by email." color="bg-emerald-100 text-emerald-600" />
-              </div>
-            </>
+            <ParentHome firstName={firstName} />
           ) : (
             <StudentHome firstName={firstName} />
           )}
