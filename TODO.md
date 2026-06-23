@@ -44,7 +44,7 @@ MwanaAI is an educational platform powered by AI, designed to enhance the learni
 
 ### Content Management
 - [ ] Build subject/topic management system
-- [ ] Create content upload functionality for educators
+- [x] Create content upload functionality for educators (upload syllabus/textbook pages/PDF/Word/screenshots or a YouTube link → AI generates lesson plans, quizzes, notes & exam questions grounded in the material)
 - [ ] Implement content recommendation algorithm
 - [ ] Add tagging system for educational resources
 

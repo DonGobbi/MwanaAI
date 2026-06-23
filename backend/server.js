@@ -29,6 +29,7 @@ app.use('/api/subjects', require('./routes/subjects'));
 app.use('/api/topics', require('./routes/topics'));
 app.use('/api/tutor', require('./routes/tutor'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/youtube', require('./routes/youtube'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

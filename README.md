@@ -33,6 +33,12 @@ teachers and parents real tools to support each student.
 - **Assignments** — see tasks set by your teachers and complete them in one tap.
 
 ### For teachers
+- **Generate from your materials** — upload the syllabus, textbook pages, a
+  screenshot, a PDF or Word doc, paste text, **or drop in a YouTube link**, and
+  MwanaAI builds a lesson plan, quiz, revision notes or exam questions
+  **grounded in that material** (not generic). Images are read by the vision
+  model; PDFs/Word are parsed in-browser; YouTube transcripts are fetched
+  server-side with **yt-dlp**. You can type the brief or **say it with your voice**.
 - **AI Lesson Planner** — generate a ready-to-teach lesson plan (objectives,
   activities, assessment, homework) for any topic — and **assign a matching quiz
   to a class in one click**.

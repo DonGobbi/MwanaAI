@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { materialService, OUTPUT_TYPES } from '../services/materialService';
 import { extractFromFile } from '../utils/extractText';
+import { youtubeService } from '../services/youtubeService';
 import { useDictation } from '../hooks/useDictation';
 import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
 import { printDoc } from '../utils/printReport';
 import Markdown from './Markdown';
 import Spinner from './Spinner';
-import { FiUploadCloud, FiFileText, FiImage, FiX, FiMic, FiPrinter, FiZap } from 'react-icons/fi';
+import { FiUploadCloud, FiFileText, FiImage, FiX, FiMic, FiPrinter, FiZap, FiYoutube } from 'react-icons/fi';
 
-const KIND_ICON = { image: FiImage };
+const KIND_ICON = { image: FiImage, youtube: FiYoutube };
 
 // Generate lesson plans / quizzes / notes GROUNDED in the teacher's own
 // materials — uploaded textbook pages, the syllabus, screenshots or notes.
@@ -21,6 +22,10 @@ const MaterialGenerator = () => {
   const [materials, setMaterials] = useState([]); // { kind, name, text, image }
   const [pasted, setPasted] = useState('');
   const [instructions, setInstructions] = useState('');
+
+  const [ytUrl, setYtUrl] = useState('');
+  const [ytLoading, setYtLoading] = useState(false);
+  const [ytMsg, setYtMsg] = useState('');
 
   const [reading, setReading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,6 +57,26 @@ const MaterialGenerator = () => {
   };
 
   const removeMaterial = (idx) => setMaterials((prev) => prev.filter((_, i) => i !== idx));
+
+  const addYouTube = async () => {
+    const url = ytUrl.trim();
+    if (!url) return;
+    setYtMsg('');
+    setYtLoading(true);
+    try {
+      const { title, transcript, truncated } = await youtubeService.getTranscript(url);
+      setMaterials((prev) => [
+        ...prev,
+        { kind: 'youtube', name: title || 'YouTube video', text: transcript },
+      ]);
+      setYtUrl('');
+      setYtMsg(truncated ? 'Added ✓ (long video — transcript shortened)' : 'Transcript added ✓');
+    } catch (err) {
+      setYtMsg(err.message || 'Could not read that video.');
+    } finally {
+      setYtLoading(false);
+    }
+  };
 
   const generate = async () => {
     setError('');
@@ -96,8 +121,9 @@ const MaterialGenerator = () => {
         <h2 className="font-bold text-gray-900">Generate from your materials</h2>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Upload the syllabus, textbook pages, a screenshot or notes — or just paste text — and MwanaAI
-        builds a lesson plan, quiz or revision notes <strong>from your material</strong>, not out of the blue.
+        Upload the syllabus, textbook pages, a screenshot or notes, paste text, or drop in a
+        <strong> YouTube link</strong> — MwanaAI builds a lesson plan, quiz or revision notes
+        <strong> from your material</strong>, not out of the blue.
       </p>
 
       {/* Subject / level / output */}
@@ -125,6 +151,34 @@ const MaterialGenerator = () => {
         <FiUploadCloud className="w-5 h-5" />
         {reading ? 'Reading your file…' : 'Upload images, PDF, Word (.docx) or text files'}
       </button>
+
+      {/* YouTube */}
+      <div className="mt-3">
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-2 rounded-lg border border-gray-300 px-2 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500">
+            <FiYoutube className="text-red-600 flex-shrink-0" />
+            <input
+              value={ytUrl}
+              onChange={(e) => setYtUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addYouTube();
+                }
+              }}
+              placeholder="Paste a YouTube link — MwanaAI reads its transcript"
+              className="flex-1 border-0 focus:ring-0 text-sm py-2 bg-transparent"
+            />
+          </div>
+          <button type="button" onClick={addYouTube} disabled={ytLoading || !ytUrl.trim()}
+            className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors flex-shrink-0">
+            {ytLoading ? <Spinner className="w-4 h-4" label="Reading…" /> : 'Add video'}
+          </button>
+        </div>
+        {ytMsg && (
+          <p className={`text-xs mt-1 ${ytMsg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{ytMsg}</p>
+        )}
+      </div>
 
       {/* Attached materials */}
       {materials.length > 0 && (
