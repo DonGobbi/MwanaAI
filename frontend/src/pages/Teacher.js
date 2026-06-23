@@ -575,54 +575,59 @@ const Teacher = () => {
   // ---- Classes list ----
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-5xl">
+      <div className="container py-8 max-w-6xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Teacher Tools</h1>
         <p className="text-gray-600 text-sm mb-6">Plan lessons with AI, create classes, and track your students.</p>
 
-        {/* Flagship: generate from the teacher's own materials */}
-        <MaterialGenerator />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Left: content-creation tools */}
+          <div className="lg:col-span-2 space-y-6">
+            <MaterialGenerator />
             <LessonPlanner classes={classes} teacher={currentUser} />
           </div>
 
-          <div>
-            <form onSubmit={createClass} className="card p-4 mb-4 flex gap-2">
-          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-            placeholder="New class name (e.g. Form 2 Maths)"
-            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-          <button type="submit" disabled={creating || !newName.trim()}
-            className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium px-5 rounded-lg transition-colors">
-            {creating ? 'Creating…' : 'Create'}
-          </button>
-        </form>
+          {/* Right: class management */}
+          <aside className="lg:sticky lg:top-6">
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FiUsers className="text-primary-600" />
+                <h2 className="font-bold text-gray-900">Your classes</h2>
+              </div>
 
-        {loading ? (
-          <PageLoader />
-        ) : classes.length === 0 ? (
-          <div className="card p-6">
-            <EmptyState icon={FiUsers} title="No classes yet"
-              description="Create your first class above, then share its code with your students." />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {classes.map((c) => (
-              <button key={c.id} onClick={() => openClass(c)}
-                className="w-full text-left card p-4 hover:shadow-md flex items-center justify-between transition-shadow">
-                <div>
-                  <p className="font-semibold text-gray-800">{c.name}</p>
-                  <p className="text-xs text-gray-400">Created {new Date(c.createdAt).toLocaleDateString()}</p>
+              <form onSubmit={createClass} className="flex gap-2 mb-4">
+                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+                  placeholder="New class name"
+                  className="flex-1 min-w-0 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+                <button type="submit" disabled={creating || !newName.trim()}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors flex-shrink-0">
+                  {creating ? '…' : 'Create'}
+                </button>
+              </form>
+
+              {loading ? (
+                <PageLoader />
+              ) : classes.length === 0 ? (
+                <EmptyState compact icon={FiUsers} title="No classes yet"
+                  description="Create your first class, then share its code with students." />
+              ) : (
+                <div className="space-y-2">
+                  {classes.map((c) => (
+                    <button key={c.id} onClick={() => openClass(c)}
+                      className="w-full text-left rounded-xl border border-gray-100 hover:border-primary-200 hover:bg-primary-50 p-3 flex items-center justify-between transition-colors">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-400">Created {new Date(c.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <p className="text-xs text-gray-400">Code</p>
+                        <p className="text-base font-bold tracking-widest text-primary-600">{c.code}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Code</p>
-                  <p className="text-lg font-bold tracking-widest text-primary-600">{c.code}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-          </div>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
     </div>
