@@ -137,8 +137,10 @@ npm start            # http://localhost:3000
 **Option B — Docker** (runs frontend + backend together)
 ```bash
 docker compose up --build
-# frontend → http://localhost:3000   backend → http://localhost:5000
+# frontend → http://localhost:3100   backend → http://localhost:5100
 ```
+(Host ports 3100/5100 are used so they don't clash with other apps on 3000/5000.
+You can change them in `docker-compose.yml`.)
 
 ### 4. Firebase setup (one-time)
 1. **Authentication → Sign-in method →** enable **Email/Password**.

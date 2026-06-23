@@ -1,5 +1,7 @@
 # Run the whole MwanaAI app with: docker compose up --build
-# Frontend: http://localhost:3000   Backend: http://localhost:5000
+# Frontend: http://localhost:3100   Backend: http://localhost:5100
+# (Host ports 3100/5100 are used to avoid clashing with other apps on 3000/5000.
+#  The containers still listen on 3000/5000 internally.)
 #
 # The frontend reads its keys from frontend/.env.local (Groq + Firebase).
 # Make sure that file exists (copy frontend/.env.example to .env.local).
@@ -9,7 +11,7 @@ services:
     build: ./backend
     container_name: mwanaai-backend
     ports:
-      - "5000:5000"
+      - "5100:5000"
     environment:
       - NODE_ENV=development
       - PORT=5000
@@ -22,7 +24,7 @@ services:
     build: ./frontend
     container_name: mwanaai-frontend
     ports:
-      - "3000:3000"
+      - "3100:3000"
     env_file:
       - ./frontend/.env.local
     environment:
