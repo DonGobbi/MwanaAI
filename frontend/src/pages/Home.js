@@ -247,7 +247,7 @@ const StudentHome = ({ firstName }) => {
   return (
     <>
       {/* Welcome banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
           <p className="text-primary-50 mt-1">Pick up where you left off, or start something new.</p>
@@ -265,46 +265,53 @@ const StudentHome = ({ firstName }) => {
         <StatTile icon={FiAward} value={s.earnedBadges.length} label="Badges earned" color="bg-amber-100 text-amber-600" />
       </div>
 
-      <StudentAssignments />
-
-      {/* Daily challenge */}
-      <Link to="/quiz" className="block card p-5 mb-6 bg-gradient-to-r from-amber-50 to-primary-50 hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="font-bold text-gray-900">🎯 Daily Challenge</p>
-            <p className="text-sm text-gray-600 mt-0.5">
-              {s.streak > 0 ? 'Take a quick quiz to keep your streak alive!' : 'Take a quick quiz and start a streak!'}
-            </p>
-          </div>
-          <span className="bg-primary-600 text-white text-sm font-medium px-4 py-2 rounded-lg flex-shrink-0">Start</span>
-        </div>
-      </Link>
-
-      {/* Quick actions */}
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick actions</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {STUDENT_CARDS.map((c) => <ActionCard key={c.to} {...c} />)}
-      </div>
-
-      {/* Achievements preview */}
-      {s.earnedBadges.length > 0 && (
-        <div className="card p-5 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <FiAward className="text-amber-500" />
-              <h2 className="font-bold text-gray-900">Achievements</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main column */}
+        <div className="lg:col-span-2">
+          {/* Daily challenge */}
+          <Link to="/quiz" className="block card p-5 mb-6 bg-gradient-to-r from-amber-50 to-primary-50 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-bold text-gray-900">🎯 Daily Challenge</p>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  {s.streak > 0 ? 'Take a quick quiz to keep your streak alive!' : 'Take a quick quiz and start a streak!'}
+                </p>
+              </div>
+              <span className="bg-primary-600 text-white text-sm font-medium px-4 py-2 rounded-lg flex-shrink-0">Start</span>
             </div>
-            <Link to="/progress" className="text-sm text-primary-600 hover:underline">View all</Link>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {s.earnedBadges.slice(0, 10).map((b) => (
-              <span key={b.id} title={`${b.name} — ${b.desc}`} className="text-2xl">{b.icon}</span>
-            ))}
-          </div>
-        </div>
-      )}
+          </Link>
 
-      <JoinClassCard />
+          {/* Quick actions */}
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick actions</h2>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {STUDENT_CARDS.map((c) => <ActionCard key={c.to} {...c} />)}
+          </div>
+
+          <StudentAssignments />
+        </div>
+
+        {/* Side column */}
+        <div>
+          {s.earnedBadges.length > 0 && (
+            <div className="card p-5 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FiAward className="text-amber-500" />
+                  <h2 className="font-bold text-gray-900">Achievements</h2>
+                </div>
+                <Link to="/progress" className="text-sm text-primary-600 hover:underline">View all</Link>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {s.earnedBadges.slice(0, 10).map((b) => (
+                  <span key={b.id} title={`${b.name} — ${b.desc}`} className="text-2xl">{b.icon}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <JoinClassCard />
+        </div>
+      </div>
     </>
   );
 };
@@ -320,7 +327,7 @@ const DashboardCard = ({ to, icon: Icon, title, text, color }) => (
 );
 
 const Banner = ({ firstName, subtitle, children }) => (
-  <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-secondary-600 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+  <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
       <p className="text-primary-50 mt-1">{subtitle}</p>
@@ -461,7 +468,7 @@ const Home = () => {
     return (
       <div className="min-h-screen">
         {showOnboarding && <Onboarding onClose={() => setShowOnboarding(false)} />}
-        <div className="container py-8 max-w-4xl">
+        <div className="container py-8 max-w-6xl">
           {role === 'teacher' ? (
             <TeacherHome firstName={firstName} />
           ) : role === 'parent' ? (
@@ -477,7 +484,7 @@ const Home = () => {
   // ---- Public landing ----
   return (
     <div className="bg-white">
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-700 via-primary-600 to-secondary-600 text-white">
+      <section className="relative overflow-hidden bg-gradient-to-br from-secondary-900 via-primary-800 to-primary-600 text-white">
         <div className="container py-20 md:py-28 text-center relative z-10">
           <span className="inline-block bg-white/15 text-white text-sm px-4 py-1.5 rounded-full mb-5">AI learning for Malawi 🇲🇼</span>
           <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight">Your personal AI tutor</h1>

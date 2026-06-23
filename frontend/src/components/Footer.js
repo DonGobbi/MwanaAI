@@ -13,6 +13,7 @@ const Footer = () => {
           AI-powered learning for every student in Malawi.
         </p>
         <p>&copy; {new Date().getFullYear()} MwanaAI. All rights reserved.</p>
+        <p className="mt-1 text-xs">A Rexplore Research Labs product</p>
       </div>
     </footer>
   );

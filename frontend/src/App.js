@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -34,68 +36,50 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const RoutesTree = ({ location }) => (
+  <Routes location={location}>
+    <Route path="/" element={<Home />} />
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<Signup />} />
+    <Route path="/tutor" element={<ProtectedRoute><AITutor /></ProtectedRoute>} />
+    <Route path="/learn" element={<ProtectedRoute><Learn /></ProtectedRoute>} />
+    <Route path="/quiz" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
+    <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+    <Route path="/teacher" element={<ProtectedRoute><Teacher /></ProtectedRoute>} />
+    <Route path="/child" element={<ProtectedRoute><ParentChild /></ProtectedRoute>} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+);
+
 function AppRoutes() {
+  const { currentUser } = useAuth();
   const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Authenticated app — sidebar shell.
+  if (currentUser) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
+        <div className="lg:pl-64 flex flex-col min-h-screen min-w-0">
+          <Topbar onMenuClick={() => setMobileOpen(true)} />
+          <main className="flex-1">
+            <div key={location.pathname} className="page-transition">
+              <RoutesTree location={location} />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // Public / logged-out — simple top navbar.
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-grow">
         <div key={location.pathname} className="page-transition">
-        <Routes location={location}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route
-            path="/tutor"
-            element={
-              <ProtectedRoute>
-                <AITutor />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/learn"
-            element={
-              <ProtectedRoute>
-                <Learn />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/quiz"
-            element={
-              <ProtectedRoute>
-                <Quiz />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/progress"
-            element={
-              <ProtectedRoute>
-                <Progress />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher"
-            element={
-              <ProtectedRoute>
-                <Teacher />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/child"
-            element={
-              <ProtectedRoute>
-                <ParentChild />
-              </ProtectedRoute>
-            }
-          />
-          {/* Anything else goes home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          <RoutesTree location={location} />
         </div>
       </main>
       <Footer />

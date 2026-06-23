@@ -12,8 +12,9 @@ const Logo = ({ size = 36, className = '' }) => (
   >
     <defs>
       <linearGradient id="mwanaai-grad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#0ea5e9" />
-        <stop offset="1" stopColor="#7c3aed" />
+        <stop offset="0" stopColor="#f59e0b" />
+        <stop offset="0.55" stopColor="#ea580c" />
+        <stop offset="1" stopColor="#c2410c" />
       </linearGradient>
     </defs>
     <rect width="48" height="48" rx="12" fill="url(#mwanaai-grad)" />
