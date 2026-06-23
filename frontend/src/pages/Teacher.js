@@ -574,13 +574,17 @@ const Teacher = () => {
   // ---- Classes list ----
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-2xl">
+      <div className="container py-8 max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Teacher Tools</h1>
         <p className="text-gray-600 text-sm mb-6">Plan lessons with AI, create classes, and track your students.</p>
 
-        <LessonPlanner classes={classes} teacher={currentUser} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <LessonPlanner classes={classes} teacher={currentUser} />
+          </div>
 
-        <form onSubmit={createClass} className="card p-4 mb-4 flex gap-2">
+          <div>
+            <form onSubmit={createClass} className="card p-4 mb-4 flex gap-2">
           <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
             placeholder="New class name (e.g. Form 2 Maths)"
             className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
@@ -614,6 +618,8 @@ const Teacher = () => {
             ))}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

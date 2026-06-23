@@ -331,7 +331,7 @@ const AITutor = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-6 max-w-3xl">
+      <div className="container py-6 max-w-4xl">
         <div className="flex items-start justify-between mb-4 gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">MwanaAI Tutor</h1>

@@ -355,7 +355,7 @@ const Quiz = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-xl">
+      <div className="container py-8 max-w-3xl">
         <div className="card p-6 text-center mb-6 animate-fade-in-up">
           {assignmentRef.current && (
             <p className="text-xs text-primary-600 font-medium mb-1">Assignment completed ✓</p>
@@ -397,7 +397,7 @@ const Quiz = () => {
         </div>
 
         <h2 className="text-lg font-bold text-gray-900 mb-3">Review</h2>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           {questions.map((q, i) => {
             const chosen = answers[i];
             const correct = q.correctIndex;
