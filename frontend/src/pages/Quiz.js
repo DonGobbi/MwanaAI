@@ -216,7 +216,7 @@ const Quiz = () => {
     const loading = phase === 'loading';
     return (
       <div className="bg-gray-50 min-h-screen">
-        <div className="container py-8 max-w-xl">
+        <div className="container py-8 max-w-4xl">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Practice & Exam Quiz</h1>
           <p className="text-gray-600 text-sm mb-6">
             Generate a quiz for your class and subject. Adaptive mode tunes the difficulty to your past scores.
@@ -226,7 +226,9 @@ const Quiz = () => {
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">{error}</div>
           )}
 
-          <div className="card p-6 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2">
+              <div className="card p-6 space-y-4">
             <div>
               <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">Your class</label>
               <select id="grade" value={gradeLevel} onChange={handleGradeChange} disabled={loading}
@@ -287,6 +289,19 @@ const Quiz = () => {
               className="w-full flex items-center justify-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition-colors">
               {loading ? <Spinner className="w-5 h-5" label="Generating your quiz…" /> : 'Start quiz'}
             </button>
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <h2 className="font-bold text-gray-900 mb-3">How it works</h2>
+              <ul className="space-y-3 text-sm text-gray-600">
+                <li><span className="font-medium text-gray-800">🎯 Adaptive mode</span> — the difficulty tunes itself to your past scores.</li>
+                <li><span className="font-medium text-gray-800">📝 Exam styles</span> — practise in PSLCE, JCE or MSCE format.</li>
+                <li><span className="font-medium text-gray-800">✨ AI feedback</span> — after each quiz, see exactly what to review.</li>
+                <li><span className="font-medium text-gray-800">🔥 Build a streak</span> — quiz daily to earn badges and climb the leaderboard.</li>
+              </ul>
+              <Link to="/progress" className="inline-block mt-4 text-sm text-primary-600 hover:underline">View your progress →</Link>
+            </div>
           </div>
         </div>
       </div>
