@@ -158,6 +158,24 @@ learning, or sign up as a teacher to create classes and assignments.
 
 ---
 
+## 🔧 Maintenance — keeping YouTube working
+YouTube transcripts are fetched with **yt-dlp**, which YouTube's changes can
+occasionally break. To keep it working:
+
+- **Automatic:** the backend updates yt-dlp on startup (throttled to ~once a
+  day) and daily while running — best-effort, and skipped silently when offline.
+  Disable by setting `YTDLP_AUTO_UPDATE=false` in the backend environment.
+- **Manual (running container):**
+  ```bash
+  docker compose exec backend npm run update-ytdlp
+  ```
+- **On rebuild:** `docker compose build backend` reinstalls the latest yt-dlp.
+
+If a video still won't load, the teacher can open it on YouTube → **Show
+transcript** → copy, and paste it into the same materials box.
+
+---
+
 ## 🔒 Notes on security
 - **Firebase web config** values are public client identifiers (protected by
   Firestore security rules and API key restrictions), not secrets.

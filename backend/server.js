@@ -43,4 +43,6 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  // Keep yt-dlp fresh (best-effort) so YouTube transcripts keep working.
+  require('./utils/ytdlp').scheduleYtDlpUpdates();
 });
