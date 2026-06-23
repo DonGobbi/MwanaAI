@@ -6,6 +6,7 @@ import { aiInsights } from '../services/aiInsightsService';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
+import MaterialGenerator from '../components/MaterialGenerator';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
@@ -577,6 +578,9 @@ const Teacher = () => {
       <div className="container py-8 max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Teacher Tools</h1>
         <p className="text-gray-600 text-sm mb-6">Plan lessons with AI, create classes, and track your students.</p>
+
+        {/* Flagship: generate from the teacher's own materials */}
+        <MaterialGenerator />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <div>

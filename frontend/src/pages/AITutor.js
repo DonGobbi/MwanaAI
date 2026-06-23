@@ -5,13 +5,8 @@ import { conversationService } from '../services/conversationService';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
 import { fileToDownscaledDataUrl } from '../utils/image';
-import {
-  speak,
-  cancelSpeech,
-  ttsSupported,
-  sttSupported,
-  SpeechRecognitionCtor,
-} from '../utils/speech';
+import { speak, cancelSpeech, ttsSupported } from '../utils/speech';
+import { useDictation } from '../hooks/useDictation';
 import Markdown from '../components/Markdown';
 import EmptyState from '../components/EmptyState';
 import { FiMessageSquare } from 'react-icons/fi';
@@ -62,9 +57,9 @@ const AITutor = () => {
 
   // Voice
   const [speakingId, setSpeakingId] = useState(null);
-  const [listening, setListening] = useState(false);
   const [autoRead, setAutoRead] = useState(false);
-  const recognitionRef = useRef(null);
+  const dictation = useDictation({ onText: setInputValue });
+  const { listening } = dictation;
 
   // History
   const [conversations, setConversations] = useState([]);
@@ -202,6 +197,7 @@ const AITutor = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (listening) dictation.stop(); // stop the mic before sending
     askTutor(inputValue, attachedImage);
   };
 
@@ -232,38 +228,16 @@ const AITutor = () => {
   };
 
   const toggleListening = () => {
-    if (!sttSupported) return;
-    if (listening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    const rec = new SpeechRecognitionCtor();
-    // en-GB tends to match Malawian/East-African English better than en-US.
-    rec.lang = 'en-GB';
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.onresult = (event) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setInputValue(transcript);
-    };
-    // When listening stops, focus the box so the student can read, fix any
-    // mis-heard words, and press Send when happy — nothing is sent automatically.
-    rec.onend = () => {
-      setListening(false);
-      inputRef.current?.focus();
-    };
-    rec.onerror = () => setListening(false);
-    recognitionRef.current = rec;
-    setListening(true);
-    rec.start();
+    // Keeps the mic open through pauses; tap again (or Send) to stop. The
+    // transcript fills the box so the student can fix any mis-heard words first.
+    dictation.toggle(inputValue);
+    if (!listening) inputRef.current?.focus();
   };
 
   // --- History ---
   const newChat = () => {
     cancelSpeech();
+    if (listening) dictation.stop();
     setSpeakingId(null);
     setMessages([WELCOME]);
     setInputValue('');
@@ -584,7 +558,7 @@ const AITutor = () => {
               </svg>
             </button>
 
-            {sttSupported && (
+            {dictation.supported && (
               <button
                 type="button"
                 onClick={toggleListening}
@@ -609,7 +583,7 @@ const AITutor = () => {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={
                 listening
-                  ? 'Listening… speak now'
+                  ? 'Listening… keep talking, then tap 🎤 or Send'
                   : ready
                   ? 'Type your question…'
                   : 'Choose your class and subject first…'
