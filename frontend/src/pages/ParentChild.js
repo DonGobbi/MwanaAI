@@ -51,7 +51,7 @@ const ParentChild = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-2xl">
+      <div className="container py-8 max-w-3xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Child's Progress</h1>
         <p className="text-gray-600 text-sm mb-6">
           Enter your child's account email to see how they are doing.

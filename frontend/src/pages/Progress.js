@@ -151,148 +151,162 @@ const Progress = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-2xl">
+      <div className="container py-8 max-w-6xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Progress</h1>
         <p className="text-gray-600 text-sm mb-6">See how you're doing across your quizzes.</p>
 
-        {/* My classes */}
-        <div className="card p-4 mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">My classes</h2>
-          {myClasses.length > 0 ? (
-            <ul className="mb-3 space-y-1">
-              {myClasses.map((c) => (
-                <li key={c.id} className="text-sm text-gray-700">
-                  • {c.className} <span className="text-gray-400">({c.teacherName})</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-500 mb-3">You haven't joined a class yet.</p>
-          )}
-          <form onSubmit={joinClass} className="flex gap-2">
-            <input
-              type="text"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="Enter class code"
-              maxLength={6}
-              className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase tracking-widest"
-            />
-            <button type="submit" disabled={joining || !joinCode.trim()}
-              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg">
-              {joining ? 'Joining…' : 'Join'}
-            </button>
-          </form>
-          {joinMsg && <p className="text-xs text-gray-500 mt-2">{joinMsg}</p>}
-        </div>
-
-        {/* Achievements show whenever there is any activity (quizzes or lessons) */}
-        {!loading && hasActivity && <Badges badges={badges} />}
-
         {loading ? (
           <PageLoader />
-        ) : totalQuizzes === 0 ? (
-          <div className="card p-6">
-            <EmptyState
-              icon={FiBarChart2}
-              title="No quizzes yet"
-              description="Take your first quiz and your scores and subject breakdown will appear here."
-            >
-              <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
-                Take your first quiz
-              </Link>
-            </EmptyState>
-          </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="card p-5 text-center">
-                <p className="text-3xl font-bold text-primary-600">{totalQuizzes}</p>
-                <p className="text-sm text-gray-500">Quizzes</p>
+            {/* Stats — full width */}
+            {totalQuizzes > 0 && (
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="card p-5 text-center">
+                  <p className="text-3xl font-bold text-primary-600">{totalQuizzes}</p>
+                  <p className="text-sm text-gray-500">Quizzes</p>
+                </div>
+                <div className="card p-5 text-center">
+                  <p className="text-3xl font-bold text-primary-600">{avg}%</p>
+                  <p className="text-sm text-gray-500">Average</p>
+                </div>
+                <div className="card p-5 text-center">
+                  <p className="text-3xl font-bold text-amber-500">🔥 {streak}</p>
+                  <p className="text-sm text-gray-500">Day streak</p>
+                </div>
               </div>
-              <div className="card p-5 text-center">
-                <p className="text-3xl font-bold text-primary-600">{avg}%</p>
-                <p className="text-sm text-gray-500">Average</p>
-              </div>
-              <div className="card p-5 text-center">
-                <p className="text-3xl font-bold text-amber-500">🔥 {streak}</p>
-                <p className="text-sm text-gray-500">Day streak</p>
-              </div>
-            </div>
-
-            {myClasses[0] && (
-              <Leaderboard
-                classId={myClasses[0].classId}
-                className={myClasses[0].className}
-                meId={currentUser?.uid}
-              />
             )}
 
-            {/* Smart study plan */}
-            <div className="card p-5 mb-6">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <FiZap className="text-primary-600" />
-                  <h2 className="font-bold text-gray-900">Smart Study Plan</h2>
-                </div>
-                <button onClick={getStudyPlan} disabled={loadingPlan}
-                  className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  {loadingPlan ? <Spinner className="w-4 h-4" label="Thinking…" /> : studyPlan ? 'Refresh plan' : '✨ Get my study plan'}
-                </button>
+            {/* Achievements — full width */}
+            {hasActivity && <Badges badges={badges} />}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {/* Main column */}
+              <div className="lg:col-span-2">
+                {totalQuizzes === 0 ? (
+                  <div className="card p-6">
+                    <EmptyState
+                      icon={FiBarChart2}
+                      title="No quizzes yet"
+                      description="Take your first quiz and your scores and subject breakdown will appear here."
+                    >
+                      <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
+                        Take your first quiz
+                      </Link>
+                    </EmptyState>
+                  </div>
+                ) : (
+                  <>
+                    {/* Smart study plan */}
+                    <div className="card p-5 mb-6">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <FiZap className="text-primary-600" />
+                          <h2 className="font-bold text-gray-900">Smart Study Plan</h2>
+                        </div>
+                        <button onClick={getStudyPlan} disabled={loadingPlan}
+                          className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                          {loadingPlan ? <Spinner className="w-4 h-4" label="Thinking…" /> : studyPlan ? 'Refresh plan' : '✨ Get my study plan'}
+                        </button>
+                      </div>
+                      {studyPlan ? (
+                        <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
+                          <Markdown content={studyPlan} />
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Let MwanaAI look at your scores and build a personalised plan for what to study next.
+                        </p>
+                      )}
+                    </div>
+
+                    <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
+                    <div className="card divide-y divide-gray-100 mb-6">
+                      {subjectRows.map((s) => (
+                        <div key={s.name} className="px-4 py-3">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-gray-800">{s.name}</span>
+                            <span className="text-gray-500">{s.avg}% · {s.count} quiz{s.count > 1 ? 'zes' : ''}</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${s.avg >= 80 ? 'bg-green-500' : s.avg >= 50 ? 'bg-primary-500' : 'bg-amber-500'}`}
+                              style={{ width: `${s.avg}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <h2 className="text-lg font-bold text-gray-900 mb-2">Recent quizzes</h2>
+                    <div className="card divide-y divide-gray-100">
+                      {results.slice(0, 20).map((r) => (
+                        <div key={r.id} className="flex justify-between items-center px-4 py-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">
+                              {r.subjectLabel || r.subject}
+                              {r.examType && r.examType !== 'General' ? ` · ${r.examType}` : ''}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {r.levelLabel || r.gradeLevel} · {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}
+                            </p>
+                          </div>
+                          <span className={`text-sm font-semibold ${r.percentage >= 80 ? 'text-green-600' : r.percentage >= 50 ? 'text-primary-600' : 'text-amber-600'}`}>
+                            {r.score}/{r.total} · {r.percentage}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="text-center mt-6">
+                      <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
+                        Take another quiz
+                      </Link>
+                    </div>
+                  </>
+                )}
               </div>
-              {studyPlan ? (
-                <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
-                  <Markdown content={studyPlan} />
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 mt-2">
-                  Let MwanaAI look at your scores and build a personalised plan for what to study next.
-                </p>
-              )}
-            </div>
 
-            <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
-            <div className="card divide-y divide-gray-100 mb-6">
-              {subjectRows.map((s) => (
-                <div key={s.name} className="px-4 py-3">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-gray-800">{s.name}</span>
-                    <span className="text-gray-500">{s.avg}% · {s.count} quiz{s.count > 1 ? 'zes' : ''}</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${s.avg >= 80 ? 'bg-green-500' : s.avg >= 50 ? 'bg-primary-500' : 'bg-amber-500'}`}
-                      style={{ width: `${s.avg}%` }}
+              {/* Side column */}
+              <div>
+                <div className="card p-4 mb-6">
+                  <h2 className="text-sm font-semibold text-gray-700 mb-2">My classes</h2>
+                  {myClasses.length > 0 ? (
+                    <ul className="mb-3 space-y-1">
+                      {myClasses.map((c) => (
+                        <li key={c.id} className="text-sm text-gray-700">
+                          • {c.className} <span className="text-gray-400">({c.teacherName})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-3">You haven't joined a class yet.</p>
+                  )}
+                  <form onSubmit={joinClass} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      placeholder="Class code"
+                      maxLength={6}
+                      className="flex-1 min-w-0 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase tracking-widest"
                     />
-                  </div>
+                    <button type="submit" disabled={joining || !joinCode.trim()}
+                      className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg flex-shrink-0">
+                      {joining ? '…' : 'Join'}
+                    </button>
+                  </form>
+                  {joinMsg && <p className="text-xs text-gray-500 mt-2">{joinMsg}</p>}
                 </div>
-              ))}
-            </div>
 
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Recent quizzes</h2>
-            <div className="card divide-y divide-gray-100">
-              {results.slice(0, 20).map((r) => (
-                <div key={r.id} className="flex justify-between items-center px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {r.subjectLabel || r.subject}
-                      {r.examType && r.examType !== 'General' ? ` · ${r.examType}` : ''}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {r.levelLabel || r.gradeLevel} · {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}
-                    </p>
-                  </div>
-                  <span className={`text-sm font-semibold ${r.percentage >= 80 ? 'text-green-600' : r.percentage >= 50 ? 'text-primary-600' : 'text-amber-600'}`}>
-                    {r.score}/{r.total} · {r.percentage}%
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-center mt-6">
-              <Link to="/quiz" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
-                Take another quiz
-              </Link>
+                {myClasses[0] && (
+                  <Leaderboard
+                    classId={myClasses[0].classId}
+                    className={myClasses[0].className}
+                    meId={currentUser?.uid}
+                  />
+                )}
+              </div>
             </div>
           </>
         )}
