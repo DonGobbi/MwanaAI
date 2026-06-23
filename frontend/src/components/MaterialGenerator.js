@@ -121,9 +121,8 @@ const MaterialGenerator = () => {
         <h2 className="font-bold text-gray-900">Generate from your materials</h2>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Upload the syllabus, textbook pages, a screenshot or notes, paste text, or drop in a
-        <strong> YouTube link</strong> — MwanaAI builds a lesson plan, quiz or revision notes
-        <strong> from your material</strong>, not out of the blue.
+        Add your material — upload files, a <strong>YouTube link</strong>, or paste text — and MwanaAI
+        builds a lesson plan, quiz or notes <strong>from it</strong>, not out of the blue.
       </p>
 
       {/* Subject / level / output */}
@@ -143,42 +142,49 @@ const MaterialGenerator = () => {
         </select>
       </div>
 
-      {/* Upload dropzone */}
+      {/* Add material — two compact columns */}
       <input ref={fileRef} type="file" multiple onChange={handleFiles}
         accept="image/*,.pdf,.docx,.txt,.md,.csv" className="hidden" />
-      <button type="button" onClick={() => fileRef.current?.click()} disabled={reading}
-        className="w-full border-2 border-dashed border-gray-200 hover:border-primary-300 rounded-xl p-4 flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-primary-600 transition-colors disabled:opacity-60">
-        <FiUploadCloud className="w-5 h-5" />
-        {reading ? 'Reading your file…' : 'Upload images, PDF, Word (.docx) or text files'}
-      </button>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {/* Upload (drop target) */}
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={reading}
+          className="border-2 border-dashed border-gray-200 hover:border-primary-300 rounded-xl p-3 flex flex-col items-center justify-center text-center gap-1 text-sm text-gray-500 hover:text-primary-600 transition-colors disabled:opacity-60">
+          <FiUploadCloud className="w-6 h-6" />
+          <span>{reading ? 'Reading your file…' : 'Upload files'}</span>
+          <span className="text-xs text-gray-400">Images, PDF, Word or text</span>
+        </button>
 
-      {/* YouTube */}
-      <div className="mt-3">
-        <div className="flex gap-2">
-          <div className="flex-1 flex items-center gap-2 rounded-lg border border-gray-300 px-2 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500">
-            <FiYoutube className="text-red-600 flex-shrink-0" />
-            <input
-              value={ytUrl}
-              onChange={(e) => setYtUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addYouTube();
-                }
-              }}
-              placeholder="Paste a YouTube link — MwanaAI reads its transcript"
-              className="flex-1 border-0 focus:ring-0 text-sm py-2 bg-transparent"
-            />
+        {/* YouTube + paste */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center gap-2 rounded-lg border border-gray-300 px-2 min-w-0 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500">
+              <FiYoutube className="text-red-600 flex-shrink-0" />
+              <input
+                value={ytUrl}
+                onChange={(e) => setYtUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addYouTube(); } }}
+                placeholder="Paste a YouTube link"
+                className="flex-1 border-0 focus:ring-0 text-sm py-2 bg-transparent min-w-0"
+              />
+            </div>
+            <button type="button" onClick={addYouTube} disabled={ytLoading || !ytUrl.trim()}
+              className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-sm font-medium px-3 rounded-lg transition-colors flex-shrink-0">
+              {ytLoading ? <Spinner className="w-4 h-4" /> : 'Add'}
+            </button>
           </div>
-          <button type="button" onClick={addYouTube} disabled={ytLoading || !ytUrl.trim()}
-            className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors flex-shrink-0">
-            {ytLoading ? <Spinner className="w-4 h-4" label="Reading…" /> : 'Add video'}
-          </button>
+          <textarea
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            rows={2}
+            placeholder="…or paste the syllabus / notes (optional)"
+            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+          />
         </div>
-        {ytMsg && (
-          <p className={`text-xs mt-1 ${ytMsg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{ytMsg}</p>
-        )}
       </div>
+
+      {ytMsg && (
+        <p className={`text-xs mt-1.5 ${ytMsg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{ytMsg}</p>
+      )}
 
       {/* Attached materials */}
       {materials.length > 0 && (
@@ -199,58 +205,46 @@ const MaterialGenerator = () => {
         </div>
       )}
 
-      {/* Paste text */}
-      <textarea
-        value={pasted}
-        onChange={(e) => setPasted(e.target.value)}
-        rows={3}
-        placeholder="…or paste the syllabus / notes here (optional)"
-        className="w-full mt-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
-      />
-
-      {/* Instructions + voice */}
-      <div className="mt-3">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          What do you want? <span className="font-normal text-gray-400">(optional — you can talk)</span>
-        </label>
-        <div className="flex items-start gap-2">
-          {dictation.supported && (
-            <button type="button" onClick={() => dictation.toggle(instructions)}
-              title={dictation.listening ? 'Stop' : 'Talk — describe what you need'}
-              className={`flex-shrink-0 p-2.5 rounded-full ${
-                dictation.listening ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-              }`}>
-              <FiMic className="w-5 h-5" />
-            </button>
-          )}
-          <textarea
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            rows={2}
-            placeholder={dictation.listening
-              ? 'Listening… keep talking, then tap the mic'
-              : 'e.g. "A 40-minute lesson with a group activity" or "10 MSCE-style questions"'}
-            className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
-          />
-        </div>
+      {/* Brief + voice */}
+      <div className="mt-3 flex items-start gap-2">
+        {dictation.supported && (
+          <button type="button" onClick={() => dictation.toggle(instructions)}
+            title={dictation.listening ? 'Stop' : 'Talk — describe what you need'}
+            className={`flex-shrink-0 p-2.5 rounded-full ${
+              dictation.listening ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+            }`}>
+            <FiMic className="w-5 h-5" />
+          </button>
+        )}
+        <textarea
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          rows={2}
+          placeholder={dictation.listening
+            ? 'Listening… keep talking, then tap the mic'
+            : 'What do you want? e.g. "A 40-minute lesson with a group activity" — or talk 🎤'}
+          className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+        />
       </div>
-
-      {needsCount && (
-        <div className="flex items-center gap-2 mt-3 text-sm">
-          <span className="text-gray-500">Number of questions:</span>
-          <select value={count} onChange={(e) => setCount(Number(e.target.value))}
-            className="rounded-lg border-gray-300 shadow-sm text-sm py-1 focus:border-primary-500 focus:ring-primary-500">
-            {[5, 10, 15, 20].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-      )}
 
       {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
 
-      <button onClick={generate} disabled={loading || reading}
-        className="mt-4 inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
-        {loading ? <Spinner className="w-4 h-4" label="Generating…" /> : `✨ Generate ${outputLabel.toLowerCase()}`}
-      </button>
+      {/* Controls */}
+      <div className="mt-4 flex items-center flex-wrap gap-3">
+        {needsCount && (
+          <label className="flex items-center gap-2 text-sm text-gray-500">
+            Questions
+            <select value={count} onChange={(e) => setCount(Number(e.target.value))}
+              className="rounded-lg border-gray-300 shadow-sm text-sm py-1 focus:border-primary-500 focus:ring-primary-500">
+              {[5, 10, 15, 20].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
+        <button onClick={generate} disabled={loading || reading}
+          className="ml-auto inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+          {loading ? <Spinner className="w-4 h-4" label="Generating…" /> : `✨ Generate ${outputLabel.toLowerCase()}`}
+        </button>
+      </div>
 
       {/* Result */}
       {result && (
