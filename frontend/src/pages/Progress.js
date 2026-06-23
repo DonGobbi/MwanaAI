@@ -11,23 +11,8 @@ import Leaderboard from '../components/Leaderboard';
 import Badges from '../components/Badges';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { computeBadges } from '../utils/badges';
+import { computeStreak } from '../utils/streak';
 import { FiBarChart2, FiZap } from 'react-icons/fi';
-
-// Current run of consecutive active days (based on quiz dates).
-function computeStreak(results) {
-  const days = new Set(results.map((r) => new Date(r.createdAt || 0).toDateString()));
-  let streak = 0;
-  const d = new Date();
-  if (!days.has(d.toDateString())) {
-    d.setDate(d.getDate() - 1);
-    if (!days.has(d.toDateString())) return 0;
-  }
-  while (days.has(d.toDateString())) {
-    streak += 1;
-    d.setDate(d.getDate() - 1);
-  }
-  return streak;
-}
 
 const Progress = () => {
   const { currentUser } = useAuth();
