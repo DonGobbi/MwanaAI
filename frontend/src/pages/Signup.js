@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Logo from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,7 +7,7 @@ import { GRADE_LEVELS } from '../config/curriculum';
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup, error: authError } = useAuth();
+  const { signup, error: authError, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -133,6 +133,11 @@ const Signup = () => {
     }
   };
   
+  // Already signed in? Don't show the signup form inside the app shell.
+  if (isAuthenticated()) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
