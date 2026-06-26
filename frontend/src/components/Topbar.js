@@ -10,6 +10,8 @@ const Topbar = ({ onMenuClick }) => {
   const role = userProfile?.userType || 'student';
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const name = currentUser?.displayName || 'Account';
   const initials = name
@@ -19,17 +21,26 @@ const Topbar = ({ onMenuClick }) => {
     .join('')
     .toUpperCase();
 
-  const handleLogout = async () => {
+  const requestLogout = () => {
     setMenuOpen(false);
+    setConfirmOpen(true);
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
     try {
       await logout();
       navigate('/');
     } catch (err) {
       console.error('Logout failed', err);
+    } finally {
+      setLoggingOut(false);
+      setConfirmOpen(false);
     }
   };
 
   return (
+    <>
     <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-gray-100 h-16 flex items-center gap-2 px-4 lg:px-6">
       <button onClick={onMenuClick} className="lg:hidden text-gray-600 hover:text-primary-600 p-1" aria-label="Open menu">
         <FiMenu className="w-6 h-6" />
@@ -61,7 +72,7 @@ const Topbar = ({ onMenuClick }) => {
                 <p className="text-xs text-gray-400 truncate">{currentUser?.email}</p>
               </div>
               <button
-                onClick={handleLogout}
+                onClick={requestLogout}
                 className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
               >
                 <FiLogOut /> Log out
@@ -71,6 +82,44 @@ const Topbar = ({ onMenuClick }) => {
         )}
       </div>
     </header>
+
+      {/* Log out confirmation */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !loggingOut && setConfirmOpen(false)}
+          />
+          <div className="relative card p-5 w-full max-w-sm animate-fade-in">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                <FiLogOut />
+              </span>
+              <h3 className="font-bold text-gray-900">Log out?</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-5">
+              You'll need to sign in again to continue using MwanaAI.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                disabled={loggingOut}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60 inline-flex items-center gap-2 transition-colors"
+              >
+                {loggingOut ? 'Logging out…' : 'Log out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
