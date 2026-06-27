@@ -159,16 +159,19 @@ export const AuthProvider = ({ children }) => {
   // Set the student's class + subjects once — the profile then drives every
   // page (Learn, Practice, Tutor, Flashcards) so they're never asked again.
   const updateCourses = async ({ gradeLevel, subjects }) => {
+    // Persist first — only update local state once the save succeeds, so a
+    // failed write doesn't leave the student "set up" in this session but
+    // empty again on the next load.
+    await firebaseService.saveUserProfile({
+      ...(gradeLevel ? { gradeLevel } : {}),
+      subjects: subjects || [],
+    });
     if (gradeLevel) localStorage.setItem(GRADE_LEVEL_KEY, gradeLevel);
     setUserProfile((prev) => ({
       ...(prev || {}),
       ...(gradeLevel ? { gradeLevel } : {}),
       subjects: subjects || [],
     }));
-    await firebaseService.saveUserProfile({
-      ...(gradeLevel ? { gradeLevel } : {}),
-      subjects: subjects || [],
-    });
   };
 
   // Logout function

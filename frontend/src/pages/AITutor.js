@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { aiTutoring } from '../services/aiTutoring';
 import { conversationService } from '../services/conversationService';
 import { useAuth } from '../contexts/AuthContext';
-import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
+import { useCourses } from '../hooks/useCourses';
+import { getSubject, getGradeLevel } from '../config/curriculum';
 import { fileToDownscaledDataUrl } from '../utils/image';
 import { speak, cancelSpeech, ttsSupported } from '../utils/speech';
 import { useDictation } from '../hooks/useDictation';
@@ -45,7 +46,8 @@ function deriveTitle(msgs) {
 }
 
 const AITutor = () => {
-  const { currentUser, userProfile, updateGradeLevel } = useAuth();
+  const { currentUser, userProfile } = useAuth();
+  const { subjects: myCourses } = useCourses();
 
   const [gradeLevel, setGradeLevel] = useState('');
   const [subject, setSubject] = useState('');
@@ -80,6 +82,14 @@ const AITutor = () => {
       userProfile?.gradeLevel || localStorage.getItem('mwanaai_grade_level') || '';
     if (saved) setGradeLevel(saved);
   }, [userProfile]);
+
+  // Default to the student's first subject (or the one from ?subject=).
+  useEffect(() => {
+    if (subject || !myCourses.length) return;
+    const wanted = new URLSearchParams(location.search).get('subject');
+    setSubject(myCourses.find((s) => s.value === wanted)?.value || myCourses[0].value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myCourses.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -126,12 +136,6 @@ const AITutor = () => {
     }, 1500);
     return () => clearTimeout(timer);
   }, [messages, currentUser, subject, gradeLevel, loadConversations]);
-
-  const handleGradeChange = (e) => {
-    const value = e.target.value;
-    setGradeLevel(value);
-    if (value) updateGradeLevel(value);
-  };
 
   const pushAssistant = (content, idPrefix = 'a') =>
     setMessages((prev) => [
@@ -368,48 +372,17 @@ const AITutor = () => {
           </div>
         )}
 
-        {/* Class + Subject pickers */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <div>
-            <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">
-              Your class
-            </label>
-            <select
-              id="grade"
-              value={gradeLevel}
-              onChange={handleGradeChange}
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >
-              <option value="">Select your class</option>
-              <optgroup label="Primary">
-                {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
-                  <option key={g.value} value={g.value}>{g.label}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Secondary">
-                {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => (
-                  <option key={g.value} value={g.value}>{g.label}</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
-              Subject
-            </label>
-            <select
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >
-              <option value="">Select a subject</option>
-              {SUBJECTS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
+        {/* Subject chips — limited to the student's own subjects (class is known) */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-sm text-gray-500">{getGradeLevel(gradeLevel)?.label || 'Your class'} ·</span>
+          {myCourses.map((s) => (
+            <button key={s.value} type="button" onClick={() => setSubject(s.value)}
+              className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
+                subject === s.value ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+              }`}>
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* Auto-read toggle */}

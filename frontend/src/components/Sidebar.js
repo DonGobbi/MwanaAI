@@ -20,6 +20,7 @@ const NAV = {
       label: 'Main',
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
+        { to: '/courses', icon: FiLayers, text: 'My Courses' },
         { to: '/learn', icon: FiBookOpen, text: 'Learn' },
         { to: '/resources', icon: FiFolder, text: 'Resources' },
         { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },

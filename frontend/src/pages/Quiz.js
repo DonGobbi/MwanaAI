@@ -5,13 +5,8 @@ import { quizService } from '../services/quizService';
 import { aiInsights } from '../services/aiInsightsService';
 import Markdown from '../components/Markdown';
 import Spinner from '../components/Spinner';
-import {
-  SUBJECTS,
-  GRADE_LEVELS,
-  EXAM_TYPES,
-  getSubject,
-  getGradeLevel,
-} from '../config/curriculum';
+import { EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
+import { useCourses } from '../hooks/useCourses';
 
 const COUNTS = [5, 10];
 const DIFFICULTIES = [
@@ -22,7 +17,8 @@ const DIFFICULTIES = [
 ];
 
 const Quiz = () => {
-  const { currentUser, userProfile, updateGradeLevel } = useAuth();
+  const { currentUser, userProfile } = useAuth();
+  const { subjects: myCourses } = useCourses();
   const location = useLocation();
 
   const [phase, setPhase] = useState('setup'); // setup | loading | taking | done
@@ -62,11 +58,14 @@ const Quiz = () => {
     }
   }, [location.state]);
 
-  const handleGradeChange = (e) => {
-    const value = e.target.value;
-    setGradeLevel(value);
-    if (value) updateGradeLevel(value);
-  };
+  // Default to the student's first subject (or ?subject=), unless launched from
+  // a teacher assignment.
+  useEffect(() => {
+    if (subject || assignmentRef.current || !myCourses.length) return;
+    const wanted = new URLSearchParams(location.search).get('subject');
+    setSubject(myCourses.find((s) => s.value === wanted)?.value || myCourses[0].value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myCourses.length]);
 
   const startQuiz = async () => {
     setError('');
@@ -230,30 +229,18 @@ const Quiz = () => {
             <div className="lg:col-span-2">
               <div className="card p-6 space-y-4">
             <div>
-              <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">Your class</label>
-              <select id="grade" value={gradeLevel} onChange={handleGradeChange} disabled={loading}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option value="">Select your class</option>
-                <optgroup label="Primary">
-                  {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
-                    <option key={g.value} value={g.value}>{g.label}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Secondary">
-                  {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => (
-                    <option key={g.value} value={g.value}>{g.label}</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-              <select id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={loading}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option value="">Select a subject</option>
-                {SUBJECTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+              <p className="text-xs text-gray-400 mb-2">{getGradeLevel(gradeLevel)?.label || 'Your class'}</p>
+              <div className="flex flex-wrap gap-2">
+                {myCourses.map((s) => (
+                  <button key={s.value} type="button" onClick={() => setSubject(s.value)} disabled={loading}
+                    className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
+                      subject === s.value ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                    }`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCourses } from '../hooks/useCourses';
 import { studyService } from '../services/studyService';
 import { classService } from '../services/classService';
 import { resourceService } from '../services/resourceService';
-import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/curriculum';
+import { getSubject } from '../config/curriculum';
 import Spinner from '../components/Spinner';
 import { FiLayers, FiChevronLeft, FiChevronRight, FiShuffle, FiRefreshCw } from 'react-icons/fi';
 
 const Flashcards = () => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser } = useAuth();
+  const { levelLabel, subjects: myCourses } = useCourses();
+  const location = useLocation();
 
   const [subject, setSubject] = useState('');
-  const [level, setLevel] = useState('');
   const [topic, setTopic] = useState('');
   const [paste, setPaste] = useState('');
   const [resourceId, setResourceId] = useState('');
@@ -24,10 +27,13 @@ const Flashcards = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Default to the student's first subject (or ?subject=).
   useEffect(() => {
-    const saved = userProfile?.gradeLevel || localStorage.getItem('mwanaai_grade_level') || '';
-    if (saved) setLevel(saved);
-  }, [userProfile]);
+    if (subject || !myCourses.length) return;
+    const wanted = new URLSearchParams(location.search).get('subject');
+    setSubject(myCourses.find((s) => s.value === wanted)?.value || myCourses[0].value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myCourses.length]);
 
   // Load the student's class resources as optional study material.
   const loadResources = useCallback(async () => {
@@ -67,7 +73,7 @@ const Flashcards = () => {
     try {
       const deck = await studyService.flashcards({
         subject: getSubject(subject)?.label || subject,
-        level: getGradeLevel(level)?.label || level,
+        level: levelLabel,
         topic,
         sourceText,
         count,
@@ -158,27 +164,18 @@ const Flashcards = () => {
         </p>
 
         <div className="card p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-              <select value={subject} onChange={(e) => setSubject(e.target.value)}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-                <option value="">Select a subject</option>
-                {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your class</label>
-              <select value={level} onChange={(e) => setLevel(e.target.value)}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-                <option value="">Select your class</option>
-                <optgroup label="Primary">
-                  {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-                </optgroup>
-                <optgroup label="Secondary">
-                  {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-                </optgroup>
-              </select>
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <p className="text-xs text-gray-400 mb-2">{levelLabel || 'Your class'}</p>
+            <div className="flex flex-wrap gap-2">
+              {myCourses.map((s) => (
+                <button key={s.value} type="button" onClick={() => setSubject(s.value)}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
+                    subject === s.value ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                  }`}>
+                  {s.label}
+                </button>
+              ))}
             </div>
           </div>
 
