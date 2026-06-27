@@ -109,5 +109,15 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
     }
+
+    // In-app notifications — private to the recipient. Each user's client both
+    // creates (addressed to itself) and reads only its own notifications.
+    // `resource == null` lets a get() on a not-yet-created notification return
+    // "missing" instead of being denied (used for the dedupe existence check).
+    match /notifications/{id} {
+      allow read: if signedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
   }
 }

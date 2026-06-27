@@ -49,7 +49,7 @@ const Topbar = ({ onMenuClick }) => {
       <div className="flex-1" />
 
       <ThemeToggle />
-      {(role === 'student' || role === 'teacher') && <NotificationBell />}
+      {(role === 'student' || role === 'teacher' || role === 'parent') && <NotificationBell />}
 
       <div className="relative">
         <button
