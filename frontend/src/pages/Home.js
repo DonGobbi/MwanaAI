@@ -5,9 +5,9 @@ import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
 import { assignmentService } from '../services/assignmentService';
 import { goalService } from '../services/goalService';
+import { useCourses } from '../hooks/useCourses';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
-import Onboarding, { ONBOARDED_KEY } from '../components/Onboarding';
 import {
   FiBookOpen,
   FiMessageCircle,
@@ -23,12 +23,15 @@ import {
   FiFolder,
   FiUserCheck,
   FiPlus,
+  FiLayers,
 } from 'react-icons/fi';
 
 const STUDENT_CARDS = [
   { to: '/learn', icon: FiBookOpen, title: 'Learn', text: 'Guided lessons by topic.', color: 'bg-sky-100 text-sky-600' },
-  { to: '/tutor', icon: FiMessageCircle, title: 'Tutor', text: 'Ask or upload homework.', color: 'bg-violet-100 text-violet-600' },
   { to: '/quiz', icon: FiEdit3, title: 'Practice', text: 'Quizzes & exams.', color: 'bg-amber-100 text-amber-600' },
+  { to: '/flashcards', icon: FiLayers, title: 'Flashcards', text: 'Revise with cards.', color: 'bg-primary-100 text-primary-600' },
+  { to: '/tutor', icon: FiMessageCircle, title: 'Tutor', text: 'Ask or upload homework.', color: 'bg-violet-100 text-violet-600' },
+  { to: '/resources', icon: FiFolder, title: 'Resources', text: 'Materials from teachers.', color: 'bg-rose-100 text-rose-600' },
   { to: '/progress', icon: FiBarChart2, title: 'Progress', text: 'Track your scores.', color: 'bg-emerald-100 text-emerald-600' },
 ];
 
@@ -250,6 +253,7 @@ const GoalsReminder = () => {
 // The full, data-rich student dashboard.
 const StudentHome = ({ firstName }) => {
   const { currentUser } = useAuth();
+  const { levelLabel, subjects } = useCourses();
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -304,18 +308,18 @@ const StudentHome = ({ firstName }) => {
 
   return (
     <>
-      {/* Welcome banner */}
+      {/* Welcome */}
       <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 text-white p-6 sm:p-8 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
-          <p className="text-primary-50 mt-1">Pick up where you left off, or start something new.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome back{firstName ? `, ${firstName}` : ''} 👋</h1>
+          <p className="text-primary-50 mt-1">{levelLabel ? `Class: ${levelLabel}` : 'Pick up where you left off, or start something new.'}</p>
         </div>
         {s.streak > 0 && (
           <span className="bg-white/15 rounded-xl px-4 py-2 text-lg font-semibold">🔥 {s.streak}-day streak</span>
         )}
       </div>
 
-      {/* Stats */}
+      {/* Learning progress */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatTile icon={FiEdit3} value={s.quizCount} label="Quizzes taken" color="bg-sky-100 text-sky-600" />
         <StatTile icon={FiTrendingUp} value={`${s.avg}%`} label="Average score" color="bg-emerald-100 text-emerald-600" />
@@ -325,49 +329,68 @@ const StudentHome = ({ firstName }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main column */}
-        <div className="lg:col-span-2">
-          {/* Daily challenge */}
-          <Link to="/quiz" className="block card p-5 mb-6 bg-gradient-to-r from-amber-50 to-primary-50 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-bold text-gray-900">🎯 Daily Challenge</p>
-                <p className="text-sm text-gray-600 mt-0.5">
-                  {s.streak > 0 ? 'Take a quick quiz to keep your streak alive!' : 'Take a quick quiz and start a streak!'}
-                </p>
-              </div>
-              <span className="bg-primary-600 text-white text-sm font-medium px-4 py-2 rounded-lg flex-shrink-0">Start</span>
+        <div className="lg:col-span-2 space-y-6">
+          {/* My courses */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">My courses</h2>
+              <Link to="/courses" className="text-sm text-primary-600 hover:underline">View all</Link>
             </div>
-          </Link>
-
-          {/* Quick actions */}
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick actions</h2>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {STUDENT_CARDS.map((c) => <ActionCard key={c.to} {...c} />)}
+            {subjects.length === 0 ? (
+              <div className="card p-5 text-sm text-gray-500">Your courses will appear here.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {subjects.map((sub) => (
+                  <div key={sub.value} className="card p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{sub.label}</p>
+                      <p className="text-xs text-gray-400">{levelLabel}</p>
+                    </div>
+                    <Link to={`/learn?subject=${sub.value}`}
+                      className="text-sm bg-primary-50 text-primary-700 hover:bg-primary-100 font-medium px-3 py-1.5 rounded-lg flex-shrink-0 transition-colors">
+                      Continue →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Assignments from teachers */}
           <StudentAssignments />
+
+          {/* Quick actions */}
+          <div>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick actions</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {STUDENT_CARDS.map((c) => <ActionCard key={c.to} {...c} />)}
+            </div>
+          </div>
         </div>
 
         {/* Side column */}
-        <div>
-          {s.earnedBadges.length > 0 && (
-            <div className="card p-5 mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FiAward className="text-amber-500" />
-                  <h2 className="font-bold text-gray-900">Achievements</h2>
-                </div>
-                <Link to="/progress" className="text-sm text-primary-600 hover:underline">View all</Link>
+        <div className="space-y-6">
+          <GoalsReminder />
+
+          {/* Achievements */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FiAward className="text-amber-500" />
+                <h2 className="font-bold text-gray-900">Achievements</h2>
               </div>
+              <Link to="/progress" className="text-sm text-primary-600 hover:underline">View all</Link>
+            </div>
+            {s.earnedBadges.length > 0 ? (
               <div className="flex flex-wrap gap-3">
-                {s.earnedBadges.slice(0, 10).map((b) => (
+                {s.earnedBadges.slice(0, 12).map((b) => (
                   <span key={b.id} title={`${b.name} — ${b.desc}`} className="text-2xl">{b.icon}</span>
                 ))}
               </div>
-            </div>
-          )}
-
-          <GoalsReminder />
+            ) : (
+              <p className="text-sm text-gray-500">Take quizzes and finish lessons to earn your first badge.</p>
+            )}
+          </div>
 
           <JoinClassCard />
         </div>
@@ -533,18 +556,10 @@ const Home = () => {
   const role = userProfile?.userType || 'student';
   const firstName = currentUser?.displayName ? currentUser.displayName.split(' ')[0] : '';
 
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  useEffect(() => {
-    if (currentUser && userProfile?.userType === 'student' && !localStorage.getItem(ONBOARDED_KEY)) {
-      setShowOnboarding(true);
-    }
-  }, [currentUser, userProfile]);
-
   // ---- Logged-in dashboard ----
   if (currentUser) {
     return (
       <div className="min-h-screen">
-        {showOnboarding && <Onboarding onClose={() => setShowOnboarding(false)} />}
         <div className="container py-8 max-w-6xl">
           {role === 'teacher' ? (
             <TeacherHome firstName={firstName} />
