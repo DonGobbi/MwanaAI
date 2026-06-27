@@ -21,6 +21,12 @@ const Signup = () => {
   
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Prefill the email when arriving from an admin invite link (/signup?email=).
+  useEffect(() => {
+    const invited = new URLSearchParams(window.location.search).get('email');
+    if (invited) setFormData((prev) => ({ ...prev, email: invited }));
+  }, []);
   
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;

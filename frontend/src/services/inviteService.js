@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { collection, doc, setDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 
 // School invites (the admin roster). One invite per email per school (the doc id
 // is deterministic so re-inviting updates rather than duplicates). When the
@@ -34,5 +34,17 @@ export const inviteService = {
 
   async remove(id) {
     await deleteDoc(doc(db, 'invites', id));
+  },
+
+  // An invitee reads their own invite(s) by email (allowed by the rules).
+  async getForEmail(email) {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return [];
+    const snap = await getDocs(query(collection(db, 'invites'), where('email', '==', clean)));
+    return snap.docs.map((d) => d.data());
+  },
+
+  async markAccepted(id) {
+    await updateDoc(doc(db, 'invites', id), { status: 'accepted' });
   },
 };

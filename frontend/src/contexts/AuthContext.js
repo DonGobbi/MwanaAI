@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import firebaseService from '../services/firebaseService';
+import { inviteService } from '../services/inviteService';
 import { PageLoader } from '../components/Spinner';
 
 const GRADE_LEVEL_KEY = 'mwanaai_grade_level';
@@ -41,10 +42,38 @@ export const AuthProvider = ({ children }) => {
             emailVerified: user.emailVerified
           });
 
-          // Load the student's profile (grade level etc.) — best effort.
+          // Load the profile, redeeming any pending admin invite FIRST (the
+          // invite sets role + class + subjects). We then read the canonical
+          // profile and set state once — so a second auth event can't clobber
+          // it with a stale read. Invited people arrive fully configured, and
+          // invited students skip the "Set up your courses" gate.
+          let profile = null;
           try {
-            const profile = await firebaseService.getUserProfile();
-            setUserProfile(profile);
+            profile = await firebaseService.getUserProfile();
+            try {
+              const invites = await inviteService.getForEmail(user.email);
+              const pending = invites.find((i) => i.status !== 'accepted');
+              if (pending) {
+                const updates = { userType: pending.role, schoolId: pending.schoolId, schoolName: pending.schoolName };
+                if (pending.role === 'student') {
+                  updates.gradeLevel = pending.gradeLevel || profile?.gradeLevel || '';
+                  updates.subjects = pending.subjects?.length ? pending.subjects : profile?.subjects || [];
+                }
+                await firebaseService.saveUserProfile(updates);
+                await inviteService.markAccepted(pending.id);
+                profile = await firebaseService.getUserProfile(); // canonical, post-redeem
+              }
+            } catch (inviteErr) {
+              /* no invite or not reachable — ignore */
+            }
+            // Don't let a stale/basic read (e.g. a second auth event that fires
+            // before the redeem write has propagated) clobber an already
+            // populated profile.
+            setUserProfile((prev) => {
+              if (prev?.subjects?.length && !profile?.subjects?.length) return prev;
+              if (prev?.userType && !profile?.userType) return prev;
+              return profile;
+            });
             if (profile?.gradeLevel) {
               localStorage.setItem(GRADE_LEVEL_KEY, profile.gradeLevel);
             }
