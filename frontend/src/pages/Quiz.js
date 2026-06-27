@@ -63,20 +63,24 @@ const Quiz = () => {
     }
   }, [location.state]);
 
-  // Default to the student's first subject (or ?subject=), unless launched from
-  // a teacher assignment.
+  // Pick the subject: honour an explicit ?subject= even if it isn't in My
+  // Courses (e.g. a "revise next"/notification link for a subject the student
+  // has quiz history in but hasn't added). Otherwise default to their first
+  // course. Skip when launched from a teacher assignment.
   useEffect(() => {
-    if (subject || assignmentRef.current || !myCourses.length) return;
+    if (subject || assignmentRef.current) return;
     const params = new URLSearchParams(location.search);
     const wanted = params.get('subject');
-    setSubject(myCourses.find((s) => s.value === wanted)?.value || myCourses[0].value);
-    // Arrived from the dashboard "Revise next" → go straight into focused practice.
+    const resolved = (wanted && getSubject(wanted)?.value) || myCourses[0]?.value || '';
+    if (!resolved) return; // nothing to select yet (no param and no courses)
+    setSubject(resolved);
+    // Arrived from "Revise next"/a notification → go straight into focused practice.
     if (params.get('focus')) {
       setFocusMode(true);
       pendingStartRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myCourses.length]);
+  }, [myCourses.length, location.search]);
 
   const startQuiz = async () => {
     setError('');
@@ -251,6 +255,12 @@ const Quiz = () => {
   // ---- Setup ----
   if (phase === 'setup' || phase === 'loading') {
     const loading = phase === 'loading';
+    // Always show the active subject as a chip, even if it isn't in My Courses
+    // (e.g. a focused-practice link for a subject the student has history in).
+    const chipSubjects =
+      subject && !myCourses.some((s) => s.value === subject) && getSubject(subject)
+        ? [getSubject(subject), ...myCourses]
+        : myCourses;
     return (
       <div className="bg-gray-50 min-h-screen">
         <div className="container py-8 max-w-4xl">
@@ -281,7 +291,7 @@ const Quiz = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
               <p className="text-xs text-gray-400 mb-2">{getGradeLevel(gradeLevel)?.label || 'Your class'}</p>
               <div className="flex flex-wrap gap-2">
-                {myCourses.map((s) => (
+                {chipSubjects.map((s) => (
                   <button key={s.value} type="button" onClick={() => setSubject(s.value)} disabled={loading}
                     className={`text-sm px-3 py-1.5 rounded-full transition-colors ${
                       subject === s.value ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
