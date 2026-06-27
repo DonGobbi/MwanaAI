@@ -4,13 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
 import { resourceService } from '../services/resourceService';
 import EmptyState from '../components/EmptyState';
+import ResourceAI from '../components/ResourceAI';
+import { getGradeLevel } from '../config/curriculum';
 import { PageLoader } from '../components/Spinner';
 import { FiFolder, FiFileText, FiImage, FiYoutube, FiChevronDown, FiExternalLink } from 'react-icons/fi';
 
 const KIND_ICON = { image: FiImage, youtube: FiYoutube, file: FiFileText, text: FiFileText };
 const KIND_LABEL = { youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document' };
 
-const ResourceRow = ({ r }) => {
+const ResourceRow = ({ r, level }) => {
   const [open, setOpen] = useState(false);
   const Icon = KIND_ICON[r.kind] || FiFileText;
   return (
@@ -43,6 +45,8 @@ const ResourceRow = ({ r }) => {
           ) : (
             <p className="text-sm text-gray-400">No readable text for this resource.</p>
           )}
+
+          <ResourceAI resource={r} level={level} />
         </div>
       )}
     </div>
@@ -50,7 +54,10 @@ const ResourceRow = ({ r }) => {
 };
 
 const Resources = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile } = useAuth();
+  const level = getGradeLevel(
+    userProfile?.gradeLevel || localStorage.getItem('mwanaai_grade_level')
+  )?.label;
   const [groups, setGroups] = useState([]); // [{ cls, resources }]
   const [loading, setLoading] = useState(true);
 
@@ -120,7 +127,7 @@ const Resources = () => {
                   <p className="text-sm text-gray-400 card p-4">Nothing shared yet.</p>
                 ) : (
                   <div className="card divide-y divide-gray-100">
-                    {g.resources.map((r) => <ResourceRow key={r.id} r={r} />)}
+                    {g.resources.map((r) => <ResourceRow key={r.id} r={r} level={level} />)}
                   </div>
                 )}
               </div>

@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { resourceService } from '../services/resourceService';
 import { extractFromFile } from '../utils/extractText';
 import { youtubeService } from '../services/youtubeService';
+import ResourceAI from './ResourceAI';
 import Spinner from './Spinner';
 import EmptyState from './EmptyState';
 import {
-  FiFolder, FiUploadCloud, FiYoutube, FiFileText, FiImage, FiX, FiPlus,
+  FiFolder, FiUploadCloud, FiYoutube, FiFileText, FiImage, FiX, FiPlus, FiChevronDown,
 } from 'react-icons/fi';
 
 const KIND_ICON = { image: FiImage, youtube: FiYoutube, file: FiFileText, text: FiFileText };
+const KIND_LABEL = { youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document' };
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -18,6 +20,33 @@ function timeAgo(ts) {
   if (days < 30) return `${days}d ago`;
   return new Date(ts).toLocaleDateString();
 }
+
+// One resource row the teacher can expand to summarize / ask MwanaAI about it.
+const ResourceItem = ({ r, onRemove }) => {
+  const [open, setOpen] = useState(false);
+  const Icon = KIND_ICON[r.kind] || FiFileText;
+  return (
+    <li className="py-2.5">
+      <div className="flex items-center gap-3">
+        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-3 min-w-0 flex-1 text-left">
+          <Icon className="w-4 h-4 text-primary-600 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-800 truncate">{r.title}</p>
+            <p className="text-xs text-gray-400">
+              {KIND_LABEL[r.kind] || 'Document'}
+              {r.chars ? ` · ${r.chars.toLocaleString()} chars` : ''} · {timeAgo(r.createdAt)}
+            </p>
+          </div>
+          <FiChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+        <button onClick={() => onRemove(r.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove">
+          <FiX className="w-4 h-4" />
+        </button>
+      </div>
+      {open && <ResourceAI resource={r} />}
+    </li>
+  );
+};
 
 // Teacher's per-class resource library: add syllabus / notes / a YouTube link /
 // pasted text; enrolled students can then read them and the AI can use them.
@@ -189,24 +218,7 @@ const ClassResources = ({ cls, teacher }) => {
             description="Add your first resource above to share it with this class." />
         ) : (
           <ul className="divide-y divide-gray-100">
-            {list.map((r) => {
-              const Icon = KIND_ICON[r.kind] || FiFileText;
-              return (
-                <li key={r.id} className="flex items-center gap-3 py-2.5">
-                  <Icon className="w-4 h-4 text-primary-600 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-800 truncate">{r.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {r.kind === 'youtube' ? 'Video transcript' : r.kind === 'image' ? 'Image' : r.kind === 'text' ? 'Notes' : 'Document'}
-                      {r.chars ? ` · ${r.chars.toLocaleString()} chars` : ''} · {timeAgo(r.createdAt)}
-                    </p>
-                  </div>
-                  <button onClick={() => remove(r.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove">
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </li>
-              );
-            })}
+            {list.map((r) => <ResourceItem key={r.id} r={r} onRemove={remove} />)}
           </ul>
         )}
       </div>
