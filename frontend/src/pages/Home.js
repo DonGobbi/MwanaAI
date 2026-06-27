@@ -466,7 +466,7 @@ const TeacherHome = ({ firstName }) => {
       try {
         const classes = await classService.listClassesForTeacher(currentUser.uid);
         const ids = classes.map((c) => c.id);
-        const memberLists = await Promise.all(ids.map((id) => classService.getMembers(id)));
+        const memberLists = await Promise.all(classes.map((c) => classService.getMembers(c)));
         const students = new Set(memberLists.flat().map((m) => m.studentId)).size;
         const submissions = (await assignmentService.teacherSubmissions(ids, 0)).length;
         if (active) setData({ classes, students, submissions });

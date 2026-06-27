@@ -389,7 +389,7 @@ const ClassNeedsAttention = ({ intel, members, onSelect }) => {
 };
 
 const Teacher = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -440,6 +440,7 @@ const Teacher = () => {
         subjectLabel: getSubject(newSubject)?.label || newSubject,
         level: newLevel,
         levelLabel: getGradeLevel(newLevel)?.label || newLevel,
+        schoolId: userProfile?.schoolId || '',
       });
       setNewSubject('');
       setNewLevel('');
@@ -477,7 +478,7 @@ const Teacher = () => {
     setConfirmDelete(false);
     try {
       const [roster, classResults, assignments] = await Promise.all([
-        classService.getMembers(cls.id),
+        classService.getMembers(cls),
         quizService.listByClass(cls.id),
         assignmentService.listForClass(cls.id),
       ]);

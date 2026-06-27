@@ -34,7 +34,7 @@ export async function generateNotifications(user, role) {
       for (const c of classes) {
         const [results, members, assignments] = await Promise.all([
           quizService.listByClass(c.id),
-          classService.getMembers(c.id),
+          classService.getMembers(c),
           assignmentService.listForClass(c.id),
         ]);
         const nameById = {};
