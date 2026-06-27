@@ -3,9 +3,18 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { schoolService } from '../services/schoolService';
 import { inviteService } from '../services/inviteService';
+import { emailService } from '../services/emailService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import Spinner, { PageLoader } from '../components/Spinner';
-import { FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX } from 'react-icons/fi';
+import { FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend } from 'react-icons/fi';
+
+// Turns the result of emailService.sendInvite into a short admin-facing note.
+const sendNote = (r) =>
+  r?.sent
+    ? 'Invite emailed ✓'
+    : r?.reason === 'email_not_configured'
+    ? 'Invite created ✓ — copy the link to share (email not set up yet)'
+    : 'Invite created ✓ — couldn’t email it, copy the link to share';
 
 const ADMIN_TABS = [
   { id: 'school', label: 'School', icon: FiHome },
@@ -28,6 +37,31 @@ const CopyButton = ({ email }) => {
   return (
     <button onClick={copy} className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0">
       <FiCopy className="w-3.5 h-3.5" /> {copied ? 'Copied!' : 'Copy link'}
+    </button>
+  );
+};
+
+// Re-send the invite email for an existing invite (best-effort).
+const EmailButton = ({ invite, schoolName }) => {
+  const [state, setState] = useState(''); // '' | 'sending' | 'sent' | 'fail'
+  const send = async () => {
+    setState('sending');
+    const r = await emailService.sendInvite({
+      email: invite.email,
+      role: invite.role,
+      schoolName,
+      gradeLabel: invite.gradeLabel || invite.gradeLevel,
+      subjects: invite.subjects,
+    });
+    setState(r?.sent ? 'sent' : 'fail');
+    setTimeout(() => setState(''), 2000);
+  };
+  return (
+    <button onClick={send} disabled={state === 'sending'}
+      className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50"
+      title="Email the invite link">
+      <FiSend className="w-3.5 h-3.5" />
+      {state === 'sending' ? 'Sending…' : state === 'sent' ? 'Sent!' : state === 'fail' ? 'Failed' : 'Email'}
     </button>
   );
 };
@@ -72,11 +106,10 @@ const StudentInvites = ({ school, admin }) => {
     if (!subjects.length) return setMsg('Pick at least one subject.');
     setBusy(true);
     try {
-      await inviteService.create(admin, school, {
-        email, role: 'student', gradeLevel,
-        gradeLabel: getGradeLevel(gradeLevel)?.label || gradeLevel, subjects,
-      });
-      setEmail(''); setGradeLevel(''); setSubjects([]); setMsg('Invite created ✓');
+      const gradeLabel = getGradeLevel(gradeLevel)?.label || gradeLevel;
+      await inviteService.create(admin, school, { email, role: 'student', gradeLevel, gradeLabel, subjects });
+      const sent = await emailService.sendInvite({ email, role: 'student', schoolName: school.name, gradeLabel, subjects });
+      setEmail(''); setGradeLevel(''); setSubjects([]); setMsg(sendNote(sent));
       load();
     } catch (err) {
       setMsg(err.message || 'Could not create invite.');
@@ -148,6 +181,7 @@ const StudentInvites = ({ school, admin }) => {
                 </p>
               </div>
               <StatusBadge status={i.status} />
+              <EmailButton invite={i} schoolName={school.name} />
               <CopyButton email={i.email} />
               <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
             </li>
@@ -185,7 +219,8 @@ const TeacherInvites = ({ school, admin }) => {
     setBusy(true);
     try {
       await inviteService.create(admin, school, { email, role: 'teacher' });
-      setEmail(''); setMsg('Invite created ✓');
+      const sent = await emailService.sendInvite({ email, role: 'teacher', schoolName: school.name });
+      setEmail(''); setMsg(sendNote(sent));
       load();
     } catch (err) {
       setMsg(err.message || 'Could not create invite.');
@@ -225,6 +260,7 @@ const TeacherInvites = ({ school, admin }) => {
             <li key={i.id} className="flex items-center gap-3 py-2.5">
               <p className="text-sm font-medium text-gray-800 truncate flex-1 min-w-0">{i.email}</p>
               <StatusBadge status={i.status} />
+              <EmailButton invite={i} schoolName={school.name} />
               <CopyButton email={i.email} />
               <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
             </li>

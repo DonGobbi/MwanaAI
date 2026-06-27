@@ -24,6 +24,7 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/email', require('./routes/email'));
 app.use('/api/resources', require('./routes/resources'));
 app.use('/api/subjects', require('./routes/subjects'));
 app.use('/api/topics', require('./routes/topics'));
