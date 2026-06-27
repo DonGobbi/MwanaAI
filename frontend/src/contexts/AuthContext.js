@@ -104,29 +104,28 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
-      
+
       // Use Firebase authentication directly
       const user = await firebaseService.login(email, password);
-      
-      // Get user data from backend after successful login
+
       try {
         // Get fresh ID token
         const idToken = await user.getIdToken(true);
         localStorage.setItem('token', idToken);
-        
-        // Fetch additional user data from backend if needed
-        // This is optional if you're storing user data in Firestore
-        // const userData = await authService.getCurrentUser();
       } catch (err) {
         console.error('Error getting user data from backend:', err);
       }
-      
+
+      // On success, deliberately leave `loading` true. The onAuthStateChanged
+      // handler clears it only after the profile (and any pending invite
+      // redemption that sets the real role) has loaded — so we never briefly
+      // render the default "student" dashboard for a teacher/admin/parent
+      // before their actual role arrives.
       return user;
     } catch (err) {
       setError(err.message || 'Failed to login');
+      setLoading(false); // failed login: re-enable the form
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
