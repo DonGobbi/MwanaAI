@@ -24,9 +24,12 @@ function buildEmail({ role, schoolName, gradeLabel, subjects, link }) {
       : '';
 
   const subject = `You've been invited to MwanaAI`;
-  const intro = isStudent
-    ? `${school} has set up a MwanaAI account for you. Your class and subjects are ready — just create your password to start learning.`
-    : `${school} has invited you to MwanaAI as a teacher. Create your password to set up your classes.`;
+  const roleIntro = {
+    student: `${school} has set up a MwanaAI account for you. Your class and subjects are ready — just create your password to start learning.`,
+    teacher: `${school} has invited you to MwanaAI as a teacher. Create your password to set up your classes.`,
+    admin: `${school} has invited you to help administer their school on MwanaAI. Create your password to enrol teachers and students.`,
+  };
+  const intro = roleIntro[role] || roleIntro.teacher;
 
   const html = `<!doctype html><html><body style="margin:0;background:#f8fafc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
     <div style="max-width:520px;margin:0 auto;padding:32px 24px">

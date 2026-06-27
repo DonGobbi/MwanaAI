@@ -8,7 +8,7 @@ import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import Spinner, { PageLoader } from '../components/Spinner';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
-  FiCheckCircle, FiArrowRight, FiTrendingUp, FiSettings,
+  FiCheckCircle, FiArrowRight, FiSettings, FiShield,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -19,18 +19,11 @@ const sendNote = (r) =>
     ? 'Invite created ✓ — copy the link to share (email not set up yet)'
     : 'Invite created ✓ — couldn’t email it, copy the link to share';
 
-const ADMIN_TABS = [
-  { id: 'overview', label: 'Overview', icon: FiGrid },
-  { id: 'students', label: 'Students', icon: FiUsers },
-  { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
-  { id: 'settings', label: 'Settings', icon: FiSettings },
-];
-
 const ONBOARD_STEPS = [
   { icon: FiHome, title: 'Create your school', text: 'Name it to get started.' },
+  { icon: FiShield, title: 'Add school admins', text: 'Delegates who enrol people.' },
   { icon: FiUserCheck, title: 'Invite teachers', text: 'They run classes and set work.' },
   { icon: FiUsers, title: 'Enrol students', text: 'Into their class & subjects.' },
-  { icon: FiTrendingUp, title: 'Watch it work', text: 'AI tracks progress for everyone.' },
 ];
 
 const CopyButton = ({ email }) => {
@@ -101,7 +94,7 @@ const StatTile = ({ icon: Icon, value, label, sub, color }) => (
 );
 
 // ---- Overview: a smart, at-a-glance command center ----
-const Overview = ({ school, onGo }) => {
+const Overview = ({ school, isSuper, onGo }) => {
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -122,10 +115,19 @@ const Overview = ({ school, onGo }) => {
 
   const students = invites.filter((i) => i.role === 'student');
   const teachers = invites.filter((i) => i.role === 'teacher');
+  const admins = invites.filter((i) => i.role === 'admin');
   const joined = (arr) => arr.filter((i) => i.status === 'accepted').length;
 
   const steps = [
     { done: true, label: 'School created', desc: school.name },
+    ...(isSuper
+      ? [{
+          done: admins.length > 0,
+          label: 'Add a school admin',
+          desc: admins.length ? `${admins.length} admin${admins.length !== 1 ? 's' : ''} · ${joined(admins)} joined` : 'Delegate teacher & student enrolment',
+          tab: 'admins',
+        }]
+      : []),
     {
       done: teachers.length > 0,
       label: 'Invite teachers',
@@ -157,7 +159,11 @@ const Overview = ({ school, onGo }) => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile icon={FiUsers} value={students.length} label="Students" sub={`${joined(students)} joined`} color="bg-sky-100 text-sky-600" />
         <StatTile icon={FiUserCheck} value={teachers.length} label="Teachers" sub={`${joined(teachers)} joined`} color="bg-violet-100 text-violet-600" />
-        <StatTile icon={FiGrid} value={GRADE_LEVELS.length} label="Classes" sub="grades available" color="bg-amber-100 text-amber-600" />
+        {isSuper ? (
+          <StatTile icon={FiShield} value={admins.length} label="School admins" sub={`${joined(admins)} joined`} color="bg-rose-100 text-rose-600" />
+        ) : (
+          <StatTile icon={FiGrid} value={GRADE_LEVELS.length} label="Classes" sub="grades available" color="bg-amber-100 text-amber-600" />
+        )}
         <StatTile icon={FiBookOpen} value={SUBJECTS.length} label="Subjects" sub="offered" color="bg-emerald-100 text-emerald-600" />
       </div>
 
@@ -192,7 +198,7 @@ const Overview = ({ school, onGo }) => {
           ))}
         </ul>
         {completed === steps.length && (
-          <p className="text-sm text-green-600 mt-4">🎉 Your school is set up — students and teachers can sign in and start learning.</p>
+          <p className="text-sm text-green-600 mt-4">🎉 Your school is set up — everyone can sign in and start learning.</p>
         )}
       </div>
 
@@ -206,11 +212,11 @@ const Overview = ({ school, onGo }) => {
           </span>
           <FiArrowRight className="text-primary-600 flex-shrink-0" />
         </button>
-        <button onClick={() => onGo('teachers')}
+        <button onClick={() => onGo(isSuper ? 'admins' : 'teachers')}
           className="card p-4 text-left hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between">
           <span>
-            <span className="block font-semibold text-gray-900">Invite a teacher</span>
-            <span className="text-xs text-gray-500">They create classes</span>
+            <span className="block font-semibold text-gray-900">{isSuper ? 'Add a school admin' : 'Invite a teacher'}</span>
+            <span className="text-xs text-gray-500">{isSuper ? 'They enrol teachers & students' : 'They create classes'}</span>
           </span>
           <FiArrowRight className="text-primary-600 flex-shrink-0" />
         </button>
@@ -219,7 +225,7 @@ const Overview = ({ school, onGo }) => {
   );
 };
 
-// ---- Students ----
+// ---- Students (with class + subjects) ----
 const StudentInvites = ({ school, admin }) => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -288,7 +294,7 @@ const StudentInvites = ({ school, admin }) => {
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Subjects ({subjects.length})</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {SUBJECTS.map((s) => {
               const on = subjects.includes(s.value);
               return (
@@ -337,8 +343,8 @@ const StudentInvites = ({ school, admin }) => {
   );
 };
 
-// ---- Teachers ----
-const TeacherInvites = ({ school, admin }) => {
+// ---- Email-only invites (teachers and school admins share this shape) ----
+const RoleInvites = ({ school, admin, role, title, description, icon: Icon, placeholder }) => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
@@ -348,13 +354,13 @@ const TeacherInvites = ({ school, admin }) => {
   const load = useCallback(async () => {
     try {
       const all = await inviteService.listForSchool(school.id);
-      setList(all.filter((i) => i.role === 'teacher'));
+      setList(all.filter((i) => i.role === role));
     } catch (err) {
       console.error('Could not load invites:', err);
     } finally {
       setLoading(false);
     }
-  }, [school.id]);
+  }, [school.id, role]);
   useEffect(() => { load(); }, [load]);
 
   const invite = async (e) => {
@@ -363,8 +369,8 @@ const TeacherInvites = ({ school, admin }) => {
     if (!/\S+@\S+\.\S+/.test(email)) return setMsg('Enter a valid email.');
     setBusy(true);
     try {
-      await inviteService.create(admin, school, { email, role: 'teacher' });
-      const sent = await emailService.sendInvite({ email, role: 'teacher', schoolName: school.name });
+      await inviteService.create(admin, school, { email, role });
+      const sent = await emailService.sendInvite({ email, role, schoolName: school.name });
       setEmail(''); setMsg(sendNote(sent));
       load();
     } catch (err) {
@@ -381,12 +387,10 @@ const TeacherInvites = ({ school, admin }) => {
 
   return (
     <div className="card p-5">
-      <div className="flex items-center gap-2 mb-1"><FiUserCheck className="text-primary-600" /><h2 className="font-bold text-gray-900">Teachers</h2></div>
-      <p className="text-sm text-gray-500 mb-3">
-        Invite a teacher. When they sign up with this email they join as a teacher and can create their classes.
-      </p>
+      <div className="flex items-center gap-2 mb-1"><Icon className="text-primary-600" /><h2 className="font-bold text-gray-900">{title}</h2></div>
+      <p className="text-sm text-gray-500 mb-3">{description}</p>
       <form onSubmit={invite} className="flex gap-2 mb-2">
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teacher@example.com"
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={placeholder}
           className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
         <button type="submit" disabled={busy}
           className="inline-flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors flex-shrink-0">
@@ -398,7 +402,7 @@ const TeacherInvites = ({ school, admin }) => {
       {loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
       ) : list.length === 0 ? (
-        <p className="text-sm text-gray-400">No teachers invited yet.</p>
+        <p className="text-sm text-gray-400">None invited yet.</p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {list.map((i) => (
@@ -418,6 +422,7 @@ const TeacherInvites = ({ school, admin }) => {
 
 const Admin = () => {
   const { currentUser, userProfile } = useAuth();
+  const isSuper = userProfile?.userType === 'superadmin';
   const [school, setSchool] = useState(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -426,9 +431,11 @@ const Admin = () => {
   const [tab, setTab] = useState('overview');
 
   const load = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser || !userProfile) return;
     try {
-      const s = await schoolService.getMySchool(currentUser.uid);
+      const s = isSuper
+        ? await schoolService.getMySchool(currentUser.uid)
+        : await schoolService.getSchool(userProfile.schoolId);
       setSchool(s);
       if (s) setName(s.name);
     } catch (err) {
@@ -436,7 +443,7 @@ const Admin = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, userProfile, isSuper]);
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
@@ -453,18 +460,34 @@ const Admin = () => {
     }
   };
 
-  if (userProfile && userProfile.userType !== 'superadmin') {
+  // Only Super Admins and School Admins may see this page.
+  if (userProfile && userProfile.userType !== 'superadmin' && userProfile.userType !== 'admin') {
     return <Navigate to="/" replace />;
   }
   if (loading) {
-    return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-4xl"><PageLoader /></div></div>;
+    return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-7xl"><PageLoader /></div></div>;
   }
 
-  // ---- Onboarding: no school yet ----
-  if (!school) {
+  // A School Admin whose school can't be found (rare).
+  if (!isSuper && !school) {
     return (
       <div className="bg-gray-50 min-h-screen">
-        <div className="container py-10 max-w-2xl">
+        <div className="container py-10 max-w-2xl text-center">
+          <div className="card p-8">
+            <FiShield className="w-8 h-8 text-primary-600 mx-auto mb-3" />
+            <h1 className="text-xl font-bold text-gray-900 mb-1">No school assigned yet</h1>
+            <p className="text-sm text-gray-500">Ask your Super Admin to add you to a school, then sign in again.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Onboarding: Super Admin with no school yet ----
+  if (isSuper && !school) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container py-10 max-w-4xl">
           <div className="text-center mb-7">
             <div className="w-16 h-16 rounded-2xl bg-primary-100 text-primary-600 flex items-center justify-center mx-auto mb-4">
               <FiHome className="w-8 h-8" />
@@ -473,7 +496,7 @@ const Admin = () => {
             <p className="text-gray-500 mt-1">Let's set up your school — it only takes a minute.</p>
           </div>
 
-          <div className="card p-6 mb-6">
+          <div className="card p-6 mb-6 max-w-2xl mx-auto">
             <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700 mb-1">School name</label>
             <div className="flex gap-2">
               <input id="schoolName" value={name} onChange={(e) => setName(e.target.value)}
@@ -489,7 +512,7 @@ const Admin = () => {
           </div>
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 text-center">What happens next</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {ONBOARD_STEPS.map((s, i) => (
               <div key={s.title} className="card p-4 flex gap-3 items-start">
                 <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center flex-shrink-0 relative">
@@ -508,16 +531,32 @@ const Admin = () => {
     );
   }
 
-  // ---- School exists: tabbed command center ----
+  // Tabs depend on role: Super Admins also manage School Admins + Settings.
+  const tabs = isSuper
+    ? [
+        { id: 'overview', label: 'Overview', icon: FiGrid },
+        { id: 'admins', label: 'School Admins', icon: FiShield },
+        { id: 'students', label: 'Students', icon: FiUsers },
+        { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
+        { id: 'settings', label: 'Settings', icon: FiSettings },
+      ]
+    : [
+        { id: 'overview', label: 'Overview', icon: FiGrid },
+        { id: 'students', label: 'Students', icon: FiUsers },
+        { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
+      ];
+
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-4xl">
+      <div className="container py-8 max-w-7xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">School administration</h1>
-        <p className="text-gray-600 text-sm mb-6">Manage your school, classes, subjects and people.</p>
+        <p className="text-gray-600 text-sm mb-6">
+          {isSuper ? 'Manage your school, school admins, teachers and students.' : "Manage your school's teachers and students."}
+        </p>
 
         {/* Tabs */}
         <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
-          {ADMIN_TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -527,11 +566,23 @@ const Admin = () => {
           ))}
         </div>
 
-        {tab === 'overview' && <Overview school={school} onGo={setTab} />}
-        {tab === 'students' && <StudentInvites school={school} admin={currentUser} />}
-        {tab === 'teachers' && <TeacherInvites school={school} admin={currentUser} />}
+        {tab === 'overview' && <Overview school={school} isSuper={isSuper} onGo={setTab} />}
 
-        {tab === 'settings' && (
+        {tab === 'admins' && isSuper && (
+          <RoleInvites school={school} admin={currentUser} role="admin" icon={FiShield}
+            title="School Admins" placeholder="admin@example.com"
+            description="Invite a school admin to help you run the school. They can enrol teachers and students, but can't create schools or other admins." />
+        )}
+
+        {tab === 'students' && <StudentInvites school={school} admin={currentUser} />}
+
+        {tab === 'teachers' && (
+          <RoleInvites school={school} admin={currentUser} role="teacher" icon={FiUserCheck}
+            title="Teachers" placeholder="teacher@example.com"
+            description="Invite a teacher. When they sign up with this email they join as a teacher and can create their classes." />
+        )}
+
+        {tab === 'settings' && isSuper && (
           <div className="space-y-6">
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-1"><FiHome className="text-primary-600" /><h2 className="font-bold text-gray-900">School name</h2></div>

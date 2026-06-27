@@ -65,6 +65,8 @@ const NAV = {
     },
   ],
 };
+// School Admins (delegates) get the same navigation as the Super Admin.
+NAV.admin = NAV.superadmin;
 
 const itemClass = ({ isActive }) =>
   `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${

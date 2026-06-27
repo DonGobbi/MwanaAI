@@ -586,21 +586,28 @@ const ParentHome = ({ firstName }) => {
   );
 };
 
-// Super Admin dashboard.
-const AdminHome = ({ firstName }) => (
-  <>
-    <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-sm">
-      <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
-      <p className="text-primary-50 mt-1">Manage your school, classes, subjects and people.</p>
-    </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <DashboardCard to="/admin" icon={FiHome} title="School administration"
-        text="Set up your school and enrol students & teachers into their classes and subjects."
-        color="bg-sky-100 text-sky-600" />
-      <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
-    </div>
-  </>
-);
+// Super Admin / School Admin dashboard.
+const AdminHome = ({ firstName, role }) => {
+  const isSuper = role === 'superadmin';
+  return (
+    <>
+      <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-sm">
+        <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
+        <p className="text-primary-50 mt-1">
+          {isSuper ? 'Manage your school, classes, subjects and people.' : "Manage your school's teachers and students."}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <DashboardCard to="/admin" icon={FiHome} title="School administration"
+          text={isSuper
+            ? 'Set up your school, add school admins, and enrol teachers & students.'
+            : 'Enrol teachers & students into their classes and subjects.'}
+          color="bg-sky-100 text-sky-600" />
+        <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
+      </div>
+    </>
+  );
+};
 
 const Home = () => {
   const { currentUser, userProfile } = useAuth();
@@ -612,8 +619,8 @@ const Home = () => {
     return (
       <div className="min-h-screen">
         <div className="container py-8 max-w-6xl">
-          {role === 'superadmin' ? (
-            <AdminHome firstName={firstName} />
+          {role === 'superadmin' || role === 'admin' ? (
+            <AdminHome firstName={firstName} role={role} />
           ) : role === 'teacher' ? (
             <TeacherHome firstName={firstName} />
           ) : role === 'parent' ? (

@@ -18,9 +18,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function myUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isSuperadmin() {
-      return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'superadmin';
+      return signedIn() && myUser().userType == 'superadmin';
+    }
+
+    // A School Admin: a delegate who manages teachers & students for one school.
+    function isSchoolAdmin() {
+      return signedIn() && myUser().userType == 'admin';
     }
 
     // User profiles — readable by signed-in users (rosters, parent lookup);
@@ -83,14 +91,22 @@ service cloud.firestore {
       allow create, update, delete: if isSuperadmin();
     }
 
-    // Invites (admin roster) — a Super Admin manages them; an invitee can read
-    // and accept their own invite (matched by email) when they sign up.
+    // Invites (admin roster) — a Super Admin manages all; a School Admin manages
+    // teacher/student invites for their own school; an invitee can read and
+    // accept their own invite (matched by email) when they sign up.
     match /invites/{id} {
-      allow read: if isSuperadmin() ||
-        (signedIn() && resource.data.email == request.auth.token.email);
-      allow create, delete: if isSuperadmin();
-      allow update: if isSuperadmin() ||
-        (signedIn() && resource.data.email == request.auth.token.email);
+      allow read: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId)
+        || (signedIn() && resource.data.email == request.auth.token.email);
+      allow create: if isSuperadmin()
+        || (isSchoolAdmin()
+            && request.resource.data.schoolId == myUser().schoolId
+            && request.resource.data.role in ['teacher', 'student']);
+      allow delete: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId);
+      allow update: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId)
+        || (signedIn() && resource.data.email == request.auth.token.email);
     }
 
     // Learning goals — private to the student who created them (query by userId).
