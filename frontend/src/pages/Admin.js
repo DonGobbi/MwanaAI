@@ -6,7 +6,10 @@ import { inviteService } from '../services/inviteService';
 import { emailService } from '../services/emailService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import Spinner, { PageLoader } from '../components/Spinner';
-import { FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend } from 'react-icons/fi';
+import {
+  FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
+  FiCheckCircle, FiArrowRight, FiTrendingUp, FiSettings,
+} from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
 const sendNote = (r) =>
@@ -17,9 +20,17 @@ const sendNote = (r) =>
     : 'Invite created ✓ — couldn’t email it, copy the link to share';
 
 const ADMIN_TABS = [
-  { id: 'school', label: 'School', icon: FiHome },
+  { id: 'overview', label: 'Overview', icon: FiGrid },
   { id: 'students', label: 'Students', icon: FiUsers },
   { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
+  { id: 'settings', label: 'Settings', icon: FiSettings },
+];
+
+const ONBOARD_STEPS = [
+  { icon: FiHome, title: 'Create your school', text: 'Name it to get started.' },
+  { icon: FiUserCheck, title: 'Invite teachers', text: 'They run classes and set work.' },
+  { icon: FiUsers, title: 'Enrol students', text: 'Into their class & subjects.' },
+  { icon: FiTrendingUp, title: 'Watch it work', text: 'AI tracks progress for everyone.' },
 ];
 
 const CopyButton = ({ email }) => {
@@ -73,6 +84,140 @@ const StatusBadge = ({ status }) => (
     {status === 'accepted' ? 'Joined' : 'Pending'}
   </span>
 );
+
+const StatTile = ({ icon: Icon, value, label, sub, color }) => (
+  <div className="card p-4">
+    <div className="flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
+        <p className="text-xs text-gray-500 mt-1 truncate">{label}</p>
+      </div>
+    </div>
+    {sub != null && <p className="text-xs text-gray-400 mt-2">{sub}</p>}
+  </div>
+);
+
+// ---- Overview: a smart, at-a-glance command center ----
+const Overview = ({ school, onGo }) => {
+  const [invites, setInvites] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const all = await inviteService.listForSchool(school.id);
+        if (active) setInvites(all);
+      } catch (err) {
+        /* ignore */
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [school.id]);
+
+  const students = invites.filter((i) => i.role === 'student');
+  const teachers = invites.filter((i) => i.role === 'teacher');
+  const joined = (arr) => arr.filter((i) => i.status === 'accepted').length;
+
+  const steps = [
+    { done: true, label: 'School created', desc: school.name },
+    {
+      done: teachers.length > 0,
+      label: 'Invite teachers',
+      desc: teachers.length ? `${teachers.length} invited · ${joined(teachers)} joined` : 'Add the teachers who will run classes',
+      tab: 'teachers',
+    },
+    {
+      done: students.length > 0,
+      label: 'Enrol students',
+      desc: students.length ? `${students.length} invited · ${joined(students)} joined` : 'Add students to their class & subjects',
+      tab: 'students',
+    },
+  ];
+  const completed = steps.filter((s) => s.done).length;
+  const pct = Math.round((completed / steps.length) * 100);
+
+  return (
+    <div className="space-y-6">
+      {/* Hero */}
+      <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-7 shadow-sm">
+        <p className="text-primary-100 text-xs uppercase tracking-wide">School</p>
+        <h2 className="text-2xl sm:text-3xl font-bold">{school.name}</h2>
+        <p className="text-primary-50/90 text-sm mt-1">
+          {loading ? 'Loading…' : `${students.length} student${students.length !== 1 ? 's' : ''} · ${teachers.length} teacher${teachers.length !== 1 ? 's' : ''} invited`}
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatTile icon={FiUsers} value={students.length} label="Students" sub={`${joined(students)} joined`} color="bg-sky-100 text-sky-600" />
+        <StatTile icon={FiUserCheck} value={teachers.length} label="Teachers" sub={`${joined(teachers)} joined`} color="bg-violet-100 text-violet-600" />
+        <StatTile icon={FiGrid} value={GRADE_LEVELS.length} label="Classes" sub="grades available" color="bg-amber-100 text-amber-600" />
+        <StatTile icon={FiBookOpen} value={SUBJECTS.length} label="Subjects" sub="offered" color="bg-emerald-100 text-emerald-600" />
+      </div>
+
+      {/* Setup checklist */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-900">Set up your school</h3>
+          <span className="text-xs text-gray-400">{completed}/{steps.length} done</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
+          <div className="h-2 rounded-full bg-primary-500 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <ul className="space-y-1">
+          {steps.map((s) => (
+            <li key={s.label} className="flex items-center gap-3 py-1.5">
+              {s.done ? (
+                <FiCheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+              ) : (
+                <span className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800">{s.label}</p>
+                <p className="text-xs text-gray-400 truncate">{s.desc}</p>
+              </div>
+              {s.tab && (
+                <button onClick={() => onGo(s.tab)}
+                  className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0">
+                  {s.done ? 'Manage' : 'Add'} <FiArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {completed === steps.length && (
+          <p className="text-sm text-green-600 mt-4">🎉 Your school is set up — students and teachers can sign in and start learning.</p>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button onClick={() => onGo('students')}
+          className="card p-4 text-left hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between">
+          <span>
+            <span className="block font-semibold text-gray-900">Enrol a student</span>
+            <span className="text-xs text-gray-500">Set their class &amp; subjects</span>
+          </span>
+          <FiArrowRight className="text-primary-600 flex-shrink-0" />
+        </button>
+        <button onClick={() => onGo('teachers')}
+          className="card p-4 text-left hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between">
+          <span>
+            <span className="block font-semibold text-gray-900">Invite a teacher</span>
+            <span className="text-xs text-gray-500">They create classes</span>
+          </span>
+          <FiArrowRight className="text-primary-600 flex-shrink-0" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // ---- Students ----
 const StudentInvites = ({ school, admin }) => {
@@ -278,7 +423,7 @@ const Admin = () => {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState('school');
+  const [tab, setTab] = useState('overview');
 
   const load = useCallback(async () => {
     if (!currentUser) return;
@@ -315,19 +460,26 @@ const Admin = () => {
     return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-4xl"><PageLoader /></div></div>;
   }
 
-  return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container py-8 max-w-4xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">School administration</h1>
-        <p className="text-gray-600 text-sm mb-6">Manage your school, classes, subjects and people.</p>
+  // ---- Onboarding: no school yet ----
+  if (!school) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container py-10 max-w-2xl">
+          <div className="text-center mb-7">
+            <div className="w-16 h-16 rounded-2xl bg-primary-100 text-primary-600 flex items-center justify-center mx-auto mb-4">
+              <FiHome className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome to MwanaAI 👋</h1>
+            <p className="text-gray-500 mt-1">Let's set up your school — it only takes a minute.</p>
+          </div>
 
-        {!school ? (
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-1"><FiHome className="text-primary-600" /><h2 className="font-bold text-gray-900">Create your school</h2></div>
-            <p className="text-sm text-gray-500 mb-3">Name your school to get started.</p>
+          <div className="card p-6 mb-6">
+            <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700 mb-1">School name</label>
             <div className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="School name (e.g. Blantyre Secondary School)"
-                className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+              <input id="schoolName" value={name} onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && save()}
+                placeholder="e.g. Blantyre Secondary School"
+                className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" autoFocus />
               <button onClick={save} disabled={saving || !name.trim()}
                 className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 rounded-lg transition-colors">
                 {saving ? <Spinner className="w-4 h-4" /> : 'Create school'}
@@ -335,57 +487,82 @@ const Admin = () => {
             </div>
             {msg && <p className="text-xs text-green-600 mt-2">{msg}</p>}
           </div>
-        ) : (
-          <>
-            {/* Tabs */}
-            <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
-              {ADMIN_TABS.map((t) => (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                    tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
-                  }`}>
-                  <t.icon className="w-4 h-4" /> {t.label}
-                </button>
-              ))}
-            </div>
 
-            {tab === 'school' && (
-              <div className="space-y-6">
-                <div className="card p-5">
-                  <div className="flex items-center gap-2 mb-1"><FiHome className="text-primary-600" /><h2 className="font-bold text-gray-900">School</h2></div>
-                  <p className="text-sm text-gray-500 mb-3">Your school details.</p>
-                  <div className="flex gap-2">
-                    <input value={name} onChange={(e) => setName(e.target.value)}
-                      className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-                    <button onClick={save} disabled={saving || !name.trim()}
-                      className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 rounded-lg transition-colors">
-                      {saving ? <Spinner className="w-4 h-4" /> : 'Save'}
-                    </button>
-                  </div>
-                  {msg && <p className="text-xs text-green-600 mt-2">{msg}</p>}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 text-center">What happens next</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ONBOARD_STEPS.map((s, i) => (
+              <div key={s.title} className="card p-4 flex gap-3 items-start">
+                <div className="w-9 h-9 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center flex-shrink-0 relative">
+                  <s.icon className="w-4 h-4" />
+                  <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
                 </div>
-
-                <div className="card p-5">
-                  <div className="flex items-center gap-2 mb-1"><FiGrid className="text-primary-600" /><h2 className="font-bold text-gray-900">Classes</h2></div>
-                  <p className="text-sm text-gray-500 mb-3">The grades students can be enrolled in (Malawi curriculum).</p>
-                  <div className="flex flex-wrap gap-2">
-                    {GRADE_LEVELS.map((g) => <span key={g.value} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">{g.label}</span>)}
-                  </div>
-                </div>
-
-                <div className="card p-5">
-                  <div className="flex items-center gap-2 mb-1"><FiBookOpen className="text-primary-600" /><h2 className="font-bold text-gray-900">Subjects</h2></div>
-                  <p className="text-sm text-gray-500 mb-3">Subjects offered (from the curriculum).</p>
-                  <div className="flex flex-wrap gap-2">
-                    {SUBJECTS.map((s) => <span key={s.value} className="text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full">{s.label}</span>)}
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{s.title}</p>
+                  <p className="text-xs text-gray-500">{s.text}</p>
                 </div>
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-            {tab === 'students' && <StudentInvites school={school} admin={currentUser} />}
-            {tab === 'teachers' && <TeacherInvites school={school} admin={currentUser} />}
-          </>
+  // ---- School exists: tabbed command center ----
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container py-8 max-w-4xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">School administration</h1>
+        <p className="text-gray-600 text-sm mb-6">Manage your school, classes, subjects and people.</p>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
+          {ADMIN_TABS.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}>
+              <t.icon className="w-4 h-4" /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overview' && <Overview school={school} onGo={setTab} />}
+        {tab === 'students' && <StudentInvites school={school} admin={currentUser} />}
+        {tab === 'teachers' && <TeacherInvites school={school} admin={currentUser} />}
+
+        {tab === 'settings' && (
+          <div className="space-y-6">
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1"><FiHome className="text-primary-600" /><h2 className="font-bold text-gray-900">School name</h2></div>
+              <p className="text-sm text-gray-500 mb-3">Rename your school.</p>
+              <div className="flex gap-2">
+                <input value={name} onChange={(e) => setName(e.target.value)}
+                  className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+                <button onClick={save} disabled={saving || !name.trim()}
+                  className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 rounded-lg transition-colors">
+                  {saving ? <Spinner className="w-4 h-4" /> : 'Save'}
+                </button>
+              </div>
+              {msg && <p className="text-xs text-green-600 mt-2">{msg}</p>}
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1"><FiGrid className="text-primary-600" /><h2 className="font-bold text-gray-900">Classes</h2></div>
+              <p className="text-sm text-gray-500 mb-3">The grades students can be enrolled in (Malawi curriculum).</p>
+              <div className="flex flex-wrap gap-2">
+                {GRADE_LEVELS.map((g) => <span key={g.value} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">{g.label}</span>)}
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1"><FiBookOpen className="text-primary-600" /><h2 className="font-bold text-gray-900">Subjects</h2></div>
+              <p className="text-sm text-gray-500 mb-3">Subjects offered (from the curriculum).</p>
+              <div className="flex flex-wrap gap-2">
+                {SUBJECTS.map((s) => <span key={s.value} className="text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full">{s.label}</span>)}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
