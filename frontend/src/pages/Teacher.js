@@ -133,9 +133,10 @@ const Assignments = ({ cls, teacher, memberCount }) => {
   );
 };
 
-// Drill into one student's full history and get an AI recommendation.
-const StudentDetail = ({ member, onBack }) => {
+// Drill into ONE student's performance IN THIS CLASS (this subject), by topic.
+const StudentDetail = ({ member, cls, onBack }) => {
   const [results, setResults] = useState([]);
+  const [topicOf, setTopicOf] = useState({});
   const [loading, setLoading] = useState(true);
   const [rec, setRec] = useState('');
   const [loadingRec, setLoadingRec] = useState(false);
@@ -144,8 +145,18 @@ const StudentDetail = ({ member, onBack }) => {
     let active = true;
     (async () => {
       try {
-        const r = await quizService.listResults(member.studentId);
-        if (active) setResults(r);
+        const [r, assignments] = await Promise.all([
+          quizService.listResults(member.studentId),
+          assignmentService.listForClass(cls.id),
+        ]);
+        const map = {};
+        assignments.forEach((a) => {
+          map[a.id] = (a.topic && a.topic.trim()) || a.title || 'General';
+        });
+        if (active) {
+          setResults(r);
+          setTopicOf(map);
+        }
       } catch (err) {
         console.error('Could not load student history:', err);
       } finally {
@@ -155,20 +166,23 @@ const StudentDetail = ({ member, onBack }) => {
     return () => {
       active = false;
     };
-  }, [member.studentId]);
+  }, [member.studentId, cls.id]);
 
-  const bySubject = {};
-  results.forEach((r) => {
-    const k = r.subjectLabel || r.subject || 'Other';
-    if (!bySubject[k]) bySubject[k] = { sum: 0, n: 0 };
-    bySubject[k].sum += r.percentage || 0;
-    bySubject[k].n += 1;
+  // Only THIS class's results (assignment quizzes carry the classId).
+  const classResults = results.filter((r) => r.classId === cls.id);
+
+  const byTopic = {};
+  classResults.forEach((r) => {
+    const k = topicOf[r.assignmentId] || 'General';
+    if (!byTopic[k]) byTopic[k] = { sum: 0, n: 0 };
+    byTopic[k].sum += r.percentage || 0;
+    byTopic[k].n += 1;
   });
-  const subjectRows = Object.entries(bySubject)
+  const topicRows = Object.entries(byTopic)
     .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.n), count: v.n }))
-    .sort((a, b) => b.avg - a.avg);
-  const avg = results.length
-    ? Math.round(results.reduce((a, r) => a + (r.percentage || 0), 0) / results.length)
+    .sort((a, b) => a.avg - b.avg); // weakest first
+  const avg = classResults.length
+    ? Math.round(classResults.reduce((a, r) => a + (r.percentage || 0), 0) / classResults.length)
     : null;
 
   const getRec = async () => {
@@ -177,8 +191,9 @@ const StudentDetail = ({ member, onBack }) => {
     try {
       const rr = await aiInsights.studentRecommendation({
         name: member.studentName,
-        level: 'their class',
-        subjectScores: subjectRows.map((s) => ({ subject: s.name, avg: s.avg, count: s.count })),
+        subject: cls.subjectLabel,
+        level: cls.levelLabel,
+        topicScores: topicRows.map((s) => ({ topic: s.name, avg: s.avg, count: s.count })),
       });
       setRec(rr);
     } catch (err) {
@@ -198,11 +213,11 @@ const StudentDetail = ({ member, onBack }) => {
               printStudentReport({
                 name: member.studentName,
                 email: member.studentEmail,
-                quizzes: results.length,
+                level: cls.name,
+                quizzes: classResults.length,
                 avg,
-                lessons: member.summary?.lessonsCompleted ?? 0,
-                subjectRows,
-                results,
+                subjectRows: topicRows,
+                results: classResults.map((r) => ({ ...r, subjectLabel: topicOf[r.assignmentId] || 'General' })),
               })
             }
             className="inline-flex items-center gap-1.5 text-sm border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg transition-colors"
@@ -213,11 +228,12 @@ const StudentDetail = ({ member, onBack }) => {
 
         <div className="card p-5 mb-5">
           <h1 className="text-2xl font-bold text-gray-900">{member.studentName}</h1>
-          <p className="text-sm text-gray-400 mb-4">{member.studentEmail}</p>
+          <p className="text-sm text-gray-400">{member.studentEmail}</p>
+          <p className="text-xs text-gray-400 mb-4">in {cls.name}</p>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div><p className="text-2xl font-bold text-primary-600">{results.length}</p><p className="text-xs text-gray-500">Quizzes</p></div>
+            <div><p className="text-2xl font-bold text-primary-600">{classResults.length}</p><p className="text-xs text-gray-500">Quizzes</p></div>
             <div><p className="text-2xl font-bold text-primary-600">{avg == null ? '—' : `${avg}%`}</p><p className="text-xs text-gray-500">Average</p></div>
-            <div><p className="text-2xl font-bold text-primary-600">{member.summary?.lessonsCompleted ?? 0}</p><p className="text-xs text-gray-500">Lessons</p></div>
+            <div><p className="text-2xl font-bold text-primary-600">{topicRows.length}</p><p className="text-xs text-gray-500">Topics</p></div>
           </div>
         </div>
 
@@ -240,16 +256,16 @@ const StudentDetail = ({ member, onBack }) => {
 
         {loading ? (
           <PageLoader label="Loading history…" />
-        ) : results.length === 0 ? (
+        ) : classResults.length === 0 ? (
           <div className="card p-6">
-            <EmptyState compact icon={FiBarChart2} title="No quizzes yet"
-              description="This student hasn't taken any quizzes yet." />
+            <EmptyState compact icon={FiBarChart2} title="No quizzes in this class yet"
+              description={`${(member.studentName || 'This student').split(' ')[0]} hasn't taken any ${cls.subjectLabel || ''} quizzes you assigned yet.`} />
           </div>
         ) : (
           <>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">By subject</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">By topic</h2>
             <div className="card divide-y divide-gray-100 mb-6">
-              {subjectRows.map((s) => (
+              {topicRows.map((s) => (
                 <div key={s.name} className="px-4 py-3">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium text-gray-800">{s.name}</span>
@@ -265,11 +281,11 @@ const StudentDetail = ({ member, onBack }) => {
 
             <h2 className="text-lg font-bold text-gray-900 mb-2">Quiz history</h2>
             <div className="card divide-y divide-gray-100">
-              {results.slice(0, 25).map((r) => (
+              {classResults.slice(0, 25).map((r) => (
                 <div key={r.id} className="flex justify-between items-center px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-800">
-                      {r.subjectLabel || r.subject}{r.examType && r.examType !== 'General' ? ` · ${r.examType}` : ''}
+                      {topicOf[r.assignmentId] || 'General'}{r.examType && r.examType !== 'General' ? ` · ${r.examType}` : ''}
                     </p>
                     <p className="text-xs text-gray-400">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</p>
                   </div>
@@ -440,7 +456,7 @@ const Teacher = () => {
 
   // ---- Single student detail ----
   if (active && selectedStudent) {
-    return <StudentDetail member={selectedStudent} onBack={() => setSelectedStudent(null)} />;
+    return <StudentDetail member={selectedStudent} cls={active} onBack={() => setSelectedStudent(null)} />;
   }
 
   // ---- Class detail ----

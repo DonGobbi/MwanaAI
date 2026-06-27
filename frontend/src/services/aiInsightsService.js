@@ -97,25 +97,26 @@ Base everything ONLY on the data above. If a section has no data, say so briefly
     );
   },
 
-  // A teacher-facing recommendation for how to help one specific student.
-  async studentRecommendation({ name, level, subjectScores }) {
+  // A teacher-facing recommendation for one student, scoped to one class's
+  // subject and broken down by topic.
+  async studentRecommendation({ name, subject, level, topicScores }) {
     const data =
-      subjectScores.map((s) => `- ${s.subject}: ${s.avg}% over ${s.count} quiz(zes)`).join('\n') ||
-      '(no quizzes yet)';
+      topicScores.map((s) => `- ${s.topic}: ${s.avg}% over ${s.count} quiz(zes)`).join('\n') ||
+      '(no quizzes in this class yet)';
     return groqChat(
       [
         {
           role: 'system',
-          content:
-            'You are a teaching assistant helping a teacher in Malawi. Give a short, practical recommendation in Markdown about how to support one specific student.',
+          content: `You are a teaching assistant helping a teacher in Malawi support one student in their ${
+            subject || 'subject'
+          } class (${level || 'school'}). Give a short, practical recommendation in Markdown.`,
         },
         {
           role: 'user',
-          content: `Student: ${name} (${level}).
-Quiz averages by subject:
+          content: `Student: ${name}. Their ${subject || 'subject'} quiz results by topic:
 ${data}
 
-In short Markdown: what this student is doing well, where they need support, and 2 specific things the teacher can do to help.`,
+In short Markdown: what this student is doing well in this subject, the specific topics they need to work on, and 2 concrete things the teacher can do to help.`,
         },
       ],
       { maxTokens: 700 }
