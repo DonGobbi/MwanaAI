@@ -52,7 +52,7 @@ Write a brief report with these Markdown sections: **Summary**, **Students who m
 
   // Class analysis SCOPED to this class's subject, focused on the specific
   // topics students are struggling with (not overall cross-subject averages).
-  async classTopicInsights({ className, subject, level, topicStats, studentWeak }) {
+  async classTopicInsights({ className, subject, level, topicStats, studentWeak, missedConcepts = [] }) {
     const topics = topicStats
       .map(
         (t) =>
@@ -66,6 +66,9 @@ Write a brief report with these Markdown sections: **Summary**, **Students who m
           .map((s) => `- ${s.name}: weak in ${s.weak.map((w) => `${w.topic} (${w.avg}%)`).join(', ')}`)
           .join('\n')
       : '(no individual weak spots stand out yet)';
+    const missed = missedConcepts.length
+      ? missedConcepts.map((m) => `- "${m.q}" (missed ${m.n} time${m.n !== 1 ? 's' : ''})`).join('\n')
+      : '';
 
     return groqChat(
       [
@@ -84,7 +87,7 @@ ${topics}
 
 Students with weak topics:
 ${students}
-
+${missed ? `\nQuestions the class missed most often:\n${missed}\n` : ''}
 Write a short report in Markdown with these sections:
 **How the class is doing** — 1-2 sentences on this subject.
 **Topics to re-teach** — the weakest topics and why students likely struggled.

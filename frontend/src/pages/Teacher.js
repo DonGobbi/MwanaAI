@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
 import { aiInsights } from '../services/aiInsightsService';
+import { analyzeClass as analyzeClassData } from '../services/classIntel';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
@@ -11,7 +12,7 @@ import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder } from 'react-icons/fi';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder, FiAlertTriangle } from 'react-icons/fi';
 
 // Tabs inside a class so the teacher sees one focused section at a time.
 const CLASS_TABS = [
@@ -302,6 +303,91 @@ const StudentDetail = ({ member, cls, onBack }) => {
   );
 };
 
+// Auto-surfaced (no AI call): the topics to re-teach and students who need help.
+const ClassNeedsAttention = ({ intel, members, onSelect }) => {
+  if (!intel || !intel.hasData) return null;
+  const memberById = {};
+  members.forEach((m) => { memberById[m.studentId] = m; });
+  const { strugglingTopics, studentsNeedingHelp, missedConcepts, classAvg } = intel;
+  const allGood = !strugglingTopics.length && !studentsNeedingHelp.length;
+
+  return (
+    <div className="card p-5 mb-5">
+      <div className="flex items-center gap-2 mb-3">
+        <FiAlertTriangle className={allGood ? 'text-green-500' : 'text-amber-500'} />
+        <h2 className="font-bold text-gray-900">Needs attention</h2>
+        <span className="text-xs text-gray-400 ml-auto">Class average {classAvg}%</span>
+      </div>
+
+      {allGood ? (
+        <p className="text-sm text-gray-600">
+          This class is doing well — no topics below 60%. Keep assigning quizzes to spot new gaps early.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Re-teach these topics</p>
+            {strugglingTopics.length ? (
+              <ul className="space-y-2">
+                {strugglingTopics.slice(0, 5).map((t) => (
+                  <li key={t.topic}>
+                    <div className="flex justify-between text-sm mb-0.5">
+                      <span className="font-medium text-gray-800">{t.topic}</span>
+                      <span className="text-amber-600 font-semibold">{t.avg}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full bg-amber-500" style={{ width: `${t.avg}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.students} student{t.students !== 1 ? 's' : ''} · {t.fails} fail{t.fails !== 1 ? 's' : ''}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-400">No weak topics.</p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Students who need help</p>
+            {studentsNeedingHelp.length ? (
+              <ul className="space-y-1">
+                {studentsNeedingHelp.slice(0, 6).map((s) => (
+                  <li key={s.id}>
+                    <button onClick={() => memberById[s.id] && onSelect(memberById[s.id])}
+                      className="w-full text-left flex items-center justify-between gap-2 hover:bg-gray-50 rounded-lg px-2 py-1 -mx-2">
+                      <span className="min-w-0">
+                        <span className="text-sm font-medium text-gray-800 block truncate">{s.name}</span>
+                        {s.weakTopics[0] && <span className="text-xs text-gray-400">weak in {s.weakTopics[0].topic}</span>}
+                      </span>
+                      <span className="text-sm font-semibold text-amber-600 flex-shrink-0">{s.avg}%</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-400">No students flagged.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {missedConcepts && missedConcepts.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Most-missed questions</p>
+          <ul className="space-y-1">
+            {missedConcepts.slice(0, 4).map((m, i) => (
+              <li key={i} className="text-sm text-gray-600 flex justify-between gap-2">
+                <span className="truncate">{m.q}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">×{m.n}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Teacher = () => {
   const { currentUser } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -318,6 +404,7 @@ const Teacher = () => {
 
   const [insights, setInsights] = useState('');
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [classIntel, setClassIntel] = useState(null); // deterministic, auto-surfaced
 
   const loadClasses = useCallback(async () => {
     if (!currentUser) return;
@@ -362,10 +449,12 @@ const Teacher = () => {
     setLoadingMembers(true);
     setMembers([]);
     setInsights('');
+    setClassIntel(null);
     try {
-      const [roster, classResults] = await Promise.all([
+      const [roster, classResults, assignments] = await Promise.all([
         classService.getMembers(cls.id),
         quizService.listByClass(cls.id),
+        assignmentService.listForClass(cls.id),
       ]);
       // Per-student stats scoped to THIS class only (assignment quizzes carry classId).
       const perStudent = {};
@@ -387,6 +476,13 @@ const Teacher = () => {
         };
       });
       setMembers(withStats);
+
+      // Auto-surface struggling topics & students (instant, no AI call needed).
+      const topicOf = {};
+      assignments.forEach((a) => { topicOf[a.id] = (a.topic && a.topic.trim()) || a.title || 'General'; });
+      const nameById = {};
+      roster.forEach((m) => { nameById[m.studentId] = m.studentName; });
+      setClassIntel(analyzeClassData({ results: classResults, topicOf, nameById }));
     } catch (err) {
       console.error('Could not load roster:', err);
     } finally {
@@ -394,76 +490,24 @@ const Teacher = () => {
     }
   };
 
+  // AI narrative — reuses the deterministic summary already surfaced above.
   const analyzeClass = async () => {
     setLoadingInsights(true);
     setInsights('');
     try {
-      // Topics come from this class's assignments; results carry the assignmentId.
-      const assignments = await assignmentService.listForClass(active.id);
-      const topicOf = {};
-      assignments.forEach((a) => {
-        topicOf[a.id] = (a.topic && a.topic.trim()) || a.title || 'General';
-      });
-
-      const results = await quizService.listByClass(active.id);
-      if (results.length === 0) {
+      if (!classIntel || !classIntel.hasData) {
         setInsights(
           'No quiz data for this class yet. Assign a quiz on a topic (Assignments tab) — once students take it, MwanaAI will show which topics the class is struggling with.'
         );
         return;
       }
-
-      const nameById = {};
-      members.forEach((m) => {
-        nameById[m.studentId] = m.studentName;
-      });
-
-      // Aggregate performance by topic (weakest first).
-      const byTopic = {};
-      results.forEach((r) => {
-        const topic = topicOf[r.assignmentId] || 'General';
-        if (!byTopic[topic]) byTopic[topic] = { attempts: 0, sum: 0, students: new Set(), fails: 0 };
-        const t = byTopic[topic];
-        t.attempts += 1;
-        t.sum += r.percentage || 0;
-        t.students.add(r.userId);
-        if ((r.percentage || 0) < 50) t.fails += 1;
-      });
-      const topicStats = Object.entries(byTopic)
-        .map(([topic, v]) => ({
-          topic,
-          avg: Math.round(v.sum / v.attempts),
-          attempts: v.attempts,
-          students: v.students.size,
-          fails: v.fails,
-        }))
-        .sort((a, b) => a.avg - b.avg);
-
-      // Per-student weak topics (below 60%).
-      const byStudent = {};
-      results.forEach((r) => {
-        const topic = topicOf[r.assignmentId] || 'General';
-        if (!byStudent[r.userId]) byStudent[r.userId] = {};
-        if (!byStudent[r.userId][topic]) byStudent[r.userId][topic] = { sum: 0, n: 0 };
-        byStudent[r.userId][topic].sum += r.percentage || 0;
-        byStudent[r.userId][topic].n += 1;
-      });
-      const studentWeak = Object.entries(byStudent)
-        .map(([sid, topics]) => ({
-          name: nameById[sid] || 'A student',
-          weak: Object.entries(topics)
-            .map(([t, v]) => ({ topic: t, avg: Math.round(v.sum / v.n) }))
-            .filter((x) => x.avg < 60)
-            .sort((a, b) => a.avg - b.avg),
-        }))
-        .filter((s) => s.weak.length);
-
       const result = await aiInsights.classTopicInsights({
         className: active.name,
         subject: active.subjectLabel,
         level: active.levelLabel,
-        topicStats,
-        studentWeak,
+        topicStats: classIntel.topicStats,
+        studentWeak: classIntel.studentWeak,
+        missedConcepts: classIntel.missedConcepts,
       });
       setInsights(result);
     } catch (err) {
@@ -521,7 +565,10 @@ const Teacher = () => {
 
           {tab === 'students' && (
             <>
-              {/* AI Class Insights */}
+              {/* Auto-surfaced: what to re-teach & who needs help (instant) */}
+              <ClassNeedsAttention intel={classIntel} members={members} onSelect={setSelectedStudent} />
+
+              {/* AI Class Insights — a written report on top of the above */}
               <div className="card p-5 mb-5">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2">
@@ -569,7 +616,12 @@ const Teacher = () => {
                         <tr key={m.id} onClick={() => setSelectedStudent(m)}
                           className="cursor-pointer hover:bg-gray-50">
                           <td className="px-4 py-3">
-                            <p className="font-medium text-gray-800">{m.studentName}</p>
+                            <p className="font-medium text-gray-800 flex items-center gap-2">
+                              {m.studentName}
+                              {m.classStats.avgScore != null && m.classStats.avgScore < 60 && (
+                                <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">needs help</span>
+                              )}
+                            </p>
                             <p className="text-xs text-gray-400">{m.studentEmail}</p>
                           </td>
                           <td className="text-center px-2 py-3 text-gray-600">{m.classStats.quizCount}</td>
