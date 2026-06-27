@@ -42,7 +42,7 @@ export const OUTPUT_TYPES = [
 function buildSystemPrompt({ subject, level }) {
   return `You are MwanaAI, an expert teacher and curriculum planner for schools in Malawi.
 You create accurate, practical teaching content for ${subject || 'the subject'} at ${level || 'school'} level.
-CRITICAL RULE: base everything strictly on the material the teacher provides. Do not invent facts that are not supported by it. If the material is thin, work with what is there and keep the scope tight. Use Malawian examples where they help. Write clean, well-structured Markdown.`;
+RULE: When the teacher provides material, base everything strictly on it and do not invent facts beyond it. When no material is provided, use accurate, standard ${subject || 'subject'} knowledge appropriate for ${level || 'this level'} and the Malawian curriculum. Use Malawian examples where they help. Write clean, well-structured Markdown.`;
 }
 
 async function callGroq(model, messages, maxTokens) {
@@ -85,24 +85,28 @@ export const materialService = {
       truncated = true;
     }
 
-    if (!sourceText && images.length === 0) {
-      throw new Error('Add some material first — upload a file, paste text, or describe what to cover.');
+    const hasMaterial = !!sourceText || images.length > 0;
+    if (!hasMaterial && !instructions.trim()) {
+      throw new Error('Add material, or say what topic to cover.');
     }
 
     const instructionLine = instructions.trim()
-      ? `\n\nThe teacher also said: "${instructions.trim()}"`
+      ? `\n\nThe teacher said: "${instructions.trim()}"`
       : '';
     const truncatedNote = truncated
       ? '\n\n(Note: the material was long and has been shortened — focus on what is given.)'
       : '';
 
-    const promptText =
-      `${task}${instructionLine}\n\n` +
-      (images.length
-        ? `The teacher has attached ${images.length} image(s) of the material${sourceText ? ' plus the text below' : ''}.`
-        : '') +
-      (sourceText ? `\n\nMATERIAL:\n${sourceText}` : '') +
-      truncatedNote;
+    // With material → ground strictly in it. Without material → generate from
+    // the subject + level curriculum (the class already pins those).
+    const promptText = hasMaterial
+      ? `${task}${instructionLine}\n\n` +
+        (images.length
+          ? `The teacher has attached ${images.length} image(s) of the material${sourceText ? ' plus the text below' : ''}.`
+          : '') +
+        (sourceText ? `\n\nMATERIAL:\n${sourceText}` : '') +
+        truncatedNote
+      : `${task}${instructionLine}\n\nThere is no uploaded material — create this for ${subject || 'the subject'} at ${level || 'school'} level, accurate and aligned to the Malawian curriculum.`;
 
     const system = { role: 'system', content: buildSystemPrompt({ subject, level }) };
     const maxTokens = outputType === 'lesson' ? 2200 : 2600;

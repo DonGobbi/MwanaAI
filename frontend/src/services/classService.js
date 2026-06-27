@@ -13,11 +13,17 @@ function generateCode() {
 
 export const classService = {
   // ---- Teacher ----
-  async createClass(teacher, name) {
+  // A class is one subject taught at one level (e.g. Geography · Form 1).
+  // Subject + level are set once here and inherited everywhere in the class.
+  async createClass(teacher, { subject, subjectLabel, level, levelLabel }) {
     const id = doc(collection(db, 'classes')).id;
     const cls = {
       id,
-      name: name.trim(),
+      name: `${subjectLabel} · ${levelLabel}`,
+      subject,
+      subjectLabel,
+      level,
+      levelLabel,
       code: generateCode(),
       teacherId: teacher.uid,
       teacherName: teacher.displayName || 'Teacher',

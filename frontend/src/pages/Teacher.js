@@ -6,12 +6,12 @@ import { aiInsights } from '../services/aiInsightsService';
 import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
-import MaterialGenerator from '../components/MaterialGenerator';
+import ClassGenerator from '../components/ClassGenerator';
 import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter } from 'react-icons/fi';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus } from 'react-icons/fi';
 
 function timeAgo(ts) {
   if (!ts) return 'never';
@@ -22,117 +22,9 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
-// AI Lesson Planner — generate a ready-to-use lesson plan for any topic,
-// and assign a matching quiz to a class in one click.
-const LessonPlanner = ({ classes, teacher }) => {
-  const [subject, setSubject] = useState('');
-  const [level, setLevel] = useState('form-2');
-  const [topic, setTopic] = useState('');
-  const [plan, setPlan] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [assignClass, setAssignClass] = useState('');
-  const [assignMsg, setAssignMsg] = useState('');
-
-  const assignQuiz = async () => {
-    const cls = (classes || []).find((c) => c.id === assignClass);
-    if (!cls) return;
-    setAssignMsg('');
-    try {
-      await assignmentService.create(teacher, cls, {
-        subject,
-        subjectLabel: getSubject(subject)?.label || subject,
-        topic: topic.trim(),
-        count: 5,
-      });
-      setAssignMsg(`Assigned to ${cls.name} ✓`);
-    } catch (err) {
-      setAssignMsg('Could not assign.');
-    }
-  };
-
-  const generate = async () => {
-    setError('');
-    if (!subject || !topic.trim()) {
-      setError('Pick a subject and type a topic.');
-      return;
-    }
-    setLoading(true);
-    setPlan('');
-    try {
-      const result = await aiInsights.lessonPlan({
-        subject: getSubject(subject)?.label || subject,
-        level: getGradeLevel(level)?.label || level,
-        topic: topic.trim(),
-      });
-      setPlan(result);
-    } catch (err) {
-      setError(err.message || 'Could not generate the lesson plan.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="card p-5 mb-6">
-      <div className="flex items-center gap-2 mb-1">
-        <FiZap className="text-primary-600" />
-        <h2 className="font-bold text-gray-900">AI Lesson Planner</h2>
-      </div>
-      <p className="text-sm text-gray-500 mb-3">
-        Generate a ready-to-teach lesson plan for any topic — objectives, activities, assessment and homework.
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-        <select value={subject} onChange={(e) => setSubject(e.target.value)}
-          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-          <option value="">Subject</option>
-          {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        <select value={level} onChange={(e) => setLevel(e.target.value)}
-          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-          {GRADE_LEVELS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-        </select>
-        <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (e.g. Photosynthesis)"
-          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-      </div>
-
-      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
-
-      <button onClick={generate} disabled={loading}
-        className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
-        {loading ? <Spinner className="w-4 h-4" label="Generating…" /> : 'Generate lesson plan'}
-      </button>
-
-      {classes && classes.length > 0 && subject && topic.trim() && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500">Assign a 5-question quiz on this topic:</span>
-          <select value={assignClass} onChange={(e) => setAssignClass(e.target.value)}
-            className="rounded-lg border-gray-300 shadow-sm text-xs py-1 focus:border-primary-500 focus:ring-primary-500">
-            <option value="">Choose class</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <button onClick={assignQuiz} disabled={!assignClass}
-            className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1 rounded-lg transition-colors">
-            Assign
-          </button>
-          {assignMsg && <span className="text-xs text-green-600">{assignMsg}</span>}
-        </div>
-      )}
-
-      {plan && (
-        <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
-          <Markdown content={plan} />
-        </div>
-      )}
-    </div>
-  );
-};
-
 // Create and track assignments for one class.
 const Assignments = ({ cls, teacher, memberCount }) => {
   const [list, setList] = useState([]);
-  const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
   const [examType, setExamType] = useState('');
   const [count, setCount] = useState(5);
@@ -156,12 +48,11 @@ const Assignments = ({ cls, teacher, memberCount }) => {
 
   const create = async (e) => {
     e.preventDefault();
-    if (!subject) return;
     setBusy(true);
     try {
       await assignmentService.create(teacher, cls, {
-        subject,
-        subjectLabel: getSubject(subject)?.label || subject,
+        subject: cls.subject || '',
+        subjectLabel: cls.subjectLabel || cls.name || '',
         topic,
         examType,
         count,
@@ -190,14 +81,11 @@ const Assignments = ({ cls, teacher, memberCount }) => {
         <FiClipboard className="text-primary-600" />
         <h2 className="font-bold text-gray-900">Assignments</h2>
       </div>
-      <p className="text-sm text-gray-500 mb-3">Set a quiz task for the class. Students see it on their dashboard.</p>
+      <p className="text-sm text-gray-500 mb-3">
+        Set a {cls.subjectLabel || cls.name} quiz task for this class. Students see it on their dashboard.
+      </p>
 
-      <form onSubmit={create} className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-        <select value={subject} onChange={(e) => setSubject(e.target.value)}
-          className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-          <option value="">Subject</option>
-          {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+      <form onSubmit={create} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
         <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (optional)"
           className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
         <select value={examType} onChange={(e) => setExamType(e.target.value)}
@@ -210,7 +98,7 @@ const Assignments = ({ cls, teacher, memberCount }) => {
             <option value={5}>5 questions</option>
             <option value={10}>10 questions</option>
           </select>
-          <button type="submit" disabled={busy || !subject}
+          <button type="submit" disabled={busy}
             className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors">
             {busy ? '…' : 'Assign'}
           </button>
@@ -395,7 +283,8 @@ const Teacher = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState('');
+  const [newSubject, setNewSubject] = useState('');
+  const [newLevel, setNewLevel] = useState('');
   const [creating, setCreating] = useState(false);
 
   const [active, setActive] = useState(null);
@@ -422,11 +311,17 @@ const Teacher = () => {
 
   const createClass = async (e) => {
     e.preventDefault();
-    if (!newName.trim() || !currentUser) return;
+    if (!newSubject || !newLevel || !currentUser) return;
     setCreating(true);
     try {
-      await classService.createClass(currentUser, newName);
-      setNewName('');
+      await classService.createClass(currentUser, {
+        subject: newSubject,
+        subjectLabel: getSubject(newSubject)?.label || newSubject,
+        level: newLevel,
+        levelLabel: getGradeLevel(newLevel)?.label || newLevel,
+      });
+      setNewSubject('');
+      setNewLevel('');
       loadClasses();
     } catch (err) {
       console.error('Could not create class:', err);
@@ -498,6 +393,12 @@ const Teacher = () => {
             </div>
           </div>
 
+          <ClassResources cls={active} teacher={currentUser} />
+
+          <ClassGenerator cls={active} teacher={currentUser} />
+
+          <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
+
           {/* AI Class Insights */}
           <div className="card p-5 mb-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -520,10 +421,6 @@ const Teacher = () => {
               </p>
             )}
           </div>
-
-          <ClassResources cls={active} teacher={currentUser} />
-
-          <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
 
           {loadingMembers ? (
             <PageLoader label="Loading students…" />
@@ -579,59 +476,81 @@ const Teacher = () => {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-6xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Teacher Tools</h1>
-        <p className="text-gray-600 text-sm mb-6">Plan lessons with AI, create classes, and track your students.</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Your classes</h1>
+        <p className="text-gray-600 text-sm mb-6">
+          Create a class for each subject and level you teach. Open a class to generate lessons with AI,
+          share resources, set assignments and track students.
+        </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* Left: content-creation tools */}
-          <div className="lg:col-span-2 space-y-6">
-            <MaterialGenerator classes={classes} teacher={currentUser} />
-            <LessonPlanner classes={classes} teacher={currentUser} />
+        {/* Create a class */}
+        <div className="card p-5 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <FiPlus className="text-primary-600" />
+            <h2 className="font-bold text-gray-900">Create a class</h2>
           </div>
-
-          {/* Right: class management */}
-          <aside className="lg:sticky lg:top-6">
-            <div className="card p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <FiUsers className="text-primary-600" />
-                <h2 className="font-bold text-gray-900">Your classes</h2>
-              </div>
-
-              <form onSubmit={createClass} className="flex gap-2 mb-4">
-                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-                  placeholder="New class name"
-                  className="flex-1 min-w-0 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-                <button type="submit" disabled={creating || !newName.trim()}
-                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 rounded-lg transition-colors flex-shrink-0">
-                  {creating ? '…' : 'Create'}
-                </button>
-              </form>
-
-              {loading ? (
-                <PageLoader />
-              ) : classes.length === 0 ? (
-                <EmptyState compact icon={FiUsers} title="No classes yet"
-                  description="Create your first class, then share its code with students." />
-              ) : (
-                <div className="space-y-2">
-                  {classes.map((c) => (
-                    <button key={c.id} onClick={() => openClass(c)}
-                      className="w-full text-left rounded-xl border border-gray-100 hover:border-primary-200 hover:bg-primary-50 p-3 flex items-center justify-between transition-colors">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate">{c.name}</p>
-                        <p className="text-xs text-gray-400">Created {new Date(c.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <p className="text-xs text-gray-400">Code</p>
-                        <p className="text-base font-bold tracking-widest text-primary-600">{c.code}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </aside>
+          <p className="text-sm text-gray-500 mb-3">
+            Pick the subject and level — we'll name the class and generate a join code for your students.
+          </p>
+          <form onSubmit={createClass} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)}
+              className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+              <option value="">Subject</option>
+              {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <select value={newLevel} onChange={(e) => setNewLevel(e.target.value)}
+              className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+              <option value="">Level / Form</option>
+              <optgroup label="Primary">
+                {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Secondary">
+                {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </optgroup>
+            </select>
+            <button type="submit" disabled={creating || !newSubject || !newLevel}
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {creating ? 'Creating…' : 'Create class'}
+            </button>
+          </form>
+          {newSubject && newLevel && (
+            <p className="text-xs text-gray-400 mt-2">
+              New class:{' '}
+              <span className="font-medium text-gray-600">
+                {getSubject(newSubject)?.label} · {getGradeLevel(newLevel)?.label}
+              </span>
+            </p>
+          )}
         </div>
+
+        {/* Classes */}
+        {loading ? (
+          <PageLoader />
+        ) : classes.length === 0 ? (
+          <div className="card p-8">
+            <EmptyState icon={FiUsers} title="No classes yet"
+              description="Create your first class above. Then open it to upload the syllabus, generate lessons and quizzes with AI, and share the join code with your students." />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {classes.map((c) => (
+              <button key={c.id} onClick={() => openClass(c)}
+                className="text-left card p-4 hover:shadow-md hover:border-primary-200 flex items-center justify-between transition-all">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{c.name}</p>
+                  <p className="text-xs text-gray-400">Created {new Date(c.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right flex-shrink-0 ml-3">
+                  <p className="text-xs text-gray-400">Code</p>
+                  <p className="text-lg font-bold tracking-widest text-primary-600">{c.code}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

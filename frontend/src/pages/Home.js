@@ -21,6 +21,7 @@ import {
   FiTrendingUp,
   FiFolder,
   FiUserCheck,
+  FiPlus,
 } from 'react-icons/fi';
 
 const STUDENT_CARDS = [
@@ -368,14 +369,31 @@ const TeacherHome = ({ firstName }) => {
     <>
       <Banner firstName={firstName} subtitle="Manage your classes and track your students." />
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <StatTile icon={FiFolder} value={d.classes.length} label="Classes" color="bg-sky-100 text-sky-600" />
-        <StatTile icon={FiUsers} value={d.students} label="Students" color="bg-violet-100 text-violet-600" />
-        <StatTile icon={FiClipboard} value={d.submissions} label="Submissions" color="bg-amber-100 text-amber-600" />
-      </div>
+      {/* First thing a teacher needs: a class. */}
+      {data && d.classes.length === 0 ? (
+        <div className="card p-6 mb-6 text-center">
+          <div className="w-12 h-12 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center mx-auto mb-3">
+            <FiPlus className="w-6 h-6" />
+          </div>
+          <h2 className="font-bold text-gray-900 mb-1">Create your first class</h2>
+          <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
+            Start with a class for a subject and level you teach (e.g. Geography · Form 1). You'll get a join
+            code for your students, and the AI will help you plan lessons and quizzes for that class.
+          </p>
+          <Link to="/teacher" className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-medium px-5 py-2 rounded-lg">
+            Create a class
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <StatTile icon={FiFolder} value={d.classes.length} label="Classes" color="bg-sky-100 text-sky-600" />
+          <StatTile icon={FiUsers} value={d.students} label="Students" color="bg-violet-100 text-violet-600" />
+          <StatTile icon={FiClipboard} value={d.submissions} label="Submissions" color="bg-amber-100 text-amber-600" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <DashboardCard to="/teacher" icon={FiUsers} title="My Classes" text="Create classes, plan lessons and track student progress." color="bg-sky-100 text-sky-600" />
+        <DashboardCard to="/teacher" icon={FiUsers} title="My Classes" text="Create classes, generate lessons with AI and track student progress." color="bg-sky-100 text-sky-600" />
         <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
       </div>
 
