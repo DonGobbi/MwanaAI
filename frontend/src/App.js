@@ -15,6 +15,7 @@ import Teacher from './pages/Teacher';
 import ParentChild from './pages/ParentChild';
 import Resources from './pages/Resources';
 import Flashcards from './pages/Flashcards';
+import CourseSetup from './pages/CourseSetup';
 import { PageLoader } from './components/Spinner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -56,9 +57,17 @@ const RoutesTree = ({ location }) => (
 );
 
 function AppRoutes() {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // A student must set their class + subjects once; the profile then drives
+  // every page, so they're never asked to pick a class/subject again.
+  const needsCourseSetup =
+    currentUser && userProfile?.userType === 'student' && !(userProfile?.subjects?.length);
+  if (needsCourseSetup) {
+    return <CourseSetup />;
+  }
 
   // Authenticated app — sidebar shell.
   if (currentUser) {

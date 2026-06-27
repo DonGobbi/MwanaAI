@@ -123,6 +123,7 @@ export const AuthProvider = ({ children }) => {
           displayName: userData.displayName || `${userData.firstName} ${userData.lastName}`,
           userType: userData.userType || 'student',
           gradeLevel: userData.gradeLevel || '',
+          subjects: userData.subjects || [],
         });
         if (userData.gradeLevel) {
           localStorage.setItem(GRADE_LEVEL_KEY, userData.gradeLevel);
@@ -155,6 +156,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Set the student's class + subjects once — the profile then drives every
+  // page (Learn, Practice, Tutor, Flashcards) so they're never asked again.
+  const updateCourses = async ({ gradeLevel, subjects }) => {
+    if (gradeLevel) localStorage.setItem(GRADE_LEVEL_KEY, gradeLevel);
+    setUserProfile((prev) => ({
+      ...(prev || {}),
+      ...(gradeLevel ? { gradeLevel } : {}),
+      subjects: subjects || [],
+    }));
+    await firebaseService.saveUserProfile({
+      ...(gradeLevel ? { gradeLevel } : {}),
+      subjects: subjects || [],
+    });
+  };
+
   // Logout function
   const logout = async () => {
     try {
@@ -176,6 +192,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     updateGradeLevel,
+    updateCourses,
     isAuthenticated: () => !!currentUser,
     getIdToken: firebaseService.getIdToken
   };
