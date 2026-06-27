@@ -71,14 +71,12 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
     }
 
-    // Class resources (shared library) — readable by the owning teacher and by
-    // students enrolled in the class (membership doc id is `classId_studentId`);
-    // only the owning teacher can add or remove them.
+    // Class resources (shared library) — readable by any signed-in user (so a
+    // `where classId ==` query is allowed, same model as classes/assignments/
+    // quiz_results above); only the owning teacher can add or remove them.
+    // (Resources are teacher-shared class materials, not private data.)
     match /resources/{id} {
-      allow read: if signedIn() && (
-        resource.data.teacherId == request.auth.uid ||
-        exists(/databases/$(database)/documents/class_members/$(resource.data.classId + '_' + request.auth.uid))
-      );
+      allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
     }
