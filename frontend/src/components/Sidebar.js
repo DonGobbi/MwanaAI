@@ -12,6 +12,7 @@ import {
   FiUserCheck,
   FiFolder,
   FiLayers,
+  FiHome,
 } from 'react-icons/fi';
 
 const NAV = {
@@ -51,6 +52,15 @@ const NAV = {
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
         { to: '/child', icon: FiUserCheck, text: 'My Child' },
+      ],
+    },
+  ],
+  superadmin: [
+    {
+      label: 'Admin',
+      items: [
+        { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
+        { to: '/admin', icon: FiHome, text: 'School' },
       ],
     },
   ],

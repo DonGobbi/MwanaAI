@@ -17,6 +17,7 @@ import Resources from './pages/Resources';
 import Flashcards from './pages/Flashcards';
 import MyCourses from './pages/MyCourses';
 import CourseSetup from './pages/CourseSetup';
+import Admin from './pages/Admin';
 import { PageLoader } from './components/Spinner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -53,6 +54,7 @@ const RoutesTree = ({ location }) => (
     <Route path="/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
     <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
     <Route path="/teacher" element={<ProtectedRoute><Teacher /></ProtectedRoute>} />
+    <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     <Route path="/child" element={<ProtectedRoute><ParentChild /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

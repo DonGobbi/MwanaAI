@@ -18,6 +18,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isSuperadmin() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'superadmin';
+    }
+
     // User profiles — readable by signed-in users (rosters, parent lookup);
     // writable only by the owner.
     match /users/{uid} {
@@ -69,6 +74,23 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // Schools — readable by any signed-in user (students/teachers see their
+    // school); only a Super Admin can create or change them.
+    match /schools/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if isSuperadmin();
+    }
+
+    // Invites (admin roster) — a Super Admin manages them; an invitee can read
+    // and accept their own invite (matched by email) when they sign up.
+    match /invites/{id} {
+      allow read: if isSuperadmin() ||
+        (signedIn() && resource.data.email == request.auth.token.email);
+      allow create, delete: if isSuperadmin();
+      allow update: if isSuperadmin() ||
+        (signedIn() && resource.data.email == request.auth.token.email);
     }
 
     // Learning goals — private to the student who created them (query by userId).
