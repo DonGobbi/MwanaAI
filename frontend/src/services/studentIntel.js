@@ -79,3 +79,25 @@ export function analyzeResults(results = []) {
 
   return { hasData: totalQuizzes > 0, totalQuizzes, overallAvg, bySubject, recentMissed, focus };
 }
+
+// The specific concepts a student recently got wrong in one subject — used to
+// target adaptive practice. `subject` may be the value ("biology") or label.
+export function weakConceptsForSubject(results = [], subject) {
+  if (!subject) return [];
+  const match = (r) => r.subject === subject || r.subjectLabel === subject;
+  const concepts = [];
+  const seen = new Set();
+  [...results]
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) // newest first
+    .forEach((r) => {
+      if (!match(r) || !Array.isArray(r.missed)) return;
+      r.missed.forEach((m) => {
+        const q = (m && m.q ? String(m.q) : '').trim();
+        if (q && !seen.has(q) && concepts.length < 6) {
+          seen.add(q);
+          concepts.push(q);
+        }
+      });
+    });
+  return concepts;
+}

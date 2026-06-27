@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
 import { aiInsights } from '../services/aiInsightsService';
+import { weakConceptsForSubject } from '../services/studentIntel';
 import Markdown from '../components/Markdown';
 import Spinner from '../components/Spinner';
 import { EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
@@ -37,6 +38,10 @@ const Quiz = () => {
   const [feedback, setFeedback] = useState('');
   const [loadingFeedback, setLoadingFeedback] = useState(false);
 
+  // Adaptive practice: target the student's weak concepts in this subject.
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusConcepts, setFocusConcepts] = useState([]);
+
   const assignmentRef = useRef(null);
   const pendingStartRef = useRef(false);
 
@@ -62,8 +67,14 @@ const Quiz = () => {
   // a teacher assignment.
   useEffect(() => {
     if (subject || assignmentRef.current || !myCourses.length) return;
-    const wanted = new URLSearchParams(location.search).get('subject');
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('subject');
     setSubject(myCourses.find((s) => s.value === wanted)?.value || myCourses[0].value);
+    // Arrived from the dashboard "Revise next" → go straight into focused practice.
+    if (params.get('focus')) {
+      setFocusMode(true);
+      pendingStartRef.current = true;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myCourses.length]);
 
@@ -75,23 +86,36 @@ const Quiz = () => {
     }
     setPhase('loading');
     try {
+      // Fetch past results once — used for adaptive difficulty AND to target the
+      // student's weak concepts in focused practice.
+      let past = [];
+      if (currentUser && (difficulty === 'adaptive' || focusMode)) {
+        try {
+          past = await quizService.listResults(currentUser.uid);
+        } catch (e) {
+          /* offline / no history — proceed without it */
+        }
+      }
+
       // Resolve adaptive difficulty from the student's past scores in this subject.
       let diff = difficulty;
       if (diff === 'adaptive') {
         diff = 'medium';
-        try {
-          const past = await quizService.listResults(currentUser.uid);
-          const subjLabel = getSubject(subject)?.label || subject;
-          const subj = past.filter((r) => (r.subjectLabel || r.subject) === subjLabel);
-          if (subj.length) {
-            const a = subj.reduce((s, r) => s + (r.percentage || 0), 0) / subj.length;
-            diff = a >= 75 ? 'hard' : a < 50 ? 'easy' : 'medium';
-          }
-        } catch (e) {
-          /* default to medium */
+        const subjLabel = getSubject(subject)?.label || subject;
+        const subj = past.filter((r) => (r.subjectLabel || r.subject) === subjLabel);
+        if (subj.length) {
+          const a = subj.reduce((s, r) => s + (r.percentage || 0), 0) / subj.length;
+          diff = a >= 75 ? 'hard' : a < 50 ? 'easy' : 'medium';
         }
       }
       setChosenDifficulty(diff);
+
+      // In focused practice, pull the exact concepts missed in this subject.
+      let concepts = [];
+      if (focusMode) {
+        concepts = weakConceptsForSubject(past, subject);
+        setFocusConcepts(concepts);
+      }
 
       const qs = await quizService.generate({
         subject: getSubject(subject)?.label || subject,
@@ -101,6 +125,7 @@ const Quiz = () => {
         count,
         difficulty: diff,
         topic: assignmentRef.current?.topic || undefined,
+        focusConcepts: concepts.length ? concepts : undefined,
       });
       setQuestions(qs);
       setAnswers(new Array(qs.length).fill(null));
@@ -219,6 +244,8 @@ const Quiz = () => {
     setError('');
     setFeedback('');
     setChosenDifficulty('');
+    setFocusMode(false);
+    setFocusConcepts([]);
   };
 
   // ---- Setup ----
@@ -234,6 +261,17 @@ const Quiz = () => {
 
           {error && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">{error}</div>
+          )}
+
+          {focusMode && (
+            <div className="mb-4 bg-primary-50 border-l-4 border-primary-400 p-3 text-sm text-primary-800">
+              🎯 <span className="font-medium">Focused practice</span> — targeting your weak spots in{' '}
+              {getSubject(subject)?.label || 'this subject'}
+              {focusConcepts.length > 0 && (
+                <span className="text-primary-700">: {focusConcepts.slice(0, 3).join('; ')}{focusConcepts.length > 3 ? '…' : ''}</span>
+              )}
+              .
+            </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -315,7 +353,10 @@ const Quiz = () => {
       <div className="bg-gray-50 min-h-screen">
         <div className="container py-8 max-w-xl">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-medium text-gray-500">Question {current + 1} of {questions.length}</span>
+            <span className="text-sm font-medium text-gray-500">
+              Question {current + 1} of {questions.length}
+              {focusMode && <span className="ml-2 text-primary-600">🎯 weak spots</span>}
+            </span>
             <span className="text-sm text-gray-400">
               {getSubject(subject)?.label} · {getGradeLevel(gradeLevel)?.label}
               {chosenDifficulty ? ` · ${chosenDifficulty}` : ''}

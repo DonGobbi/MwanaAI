@@ -11,7 +11,7 @@ const MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 export const quizService = {
   // Generate multiple-choice questions tailored to subject, level and (optional)
   // exam type. Returns an array of { question, options[4], correctIndex, explanation }.
-  async generate({ subject, level, ageHint, topic, examType, count = 5, difficulty }) {
+  async generate({ subject, level, ageHint, topic, examType, count = 5, difficulty, focusConcepts }) {
     const topicLine = topic
       ? `Focus on this topic: ${topic}.`
       : `Cover a range of topics a ${level} student studies in ${subject}.`;
@@ -21,10 +21,19 @@ export const quizService = {
     const difficultyLine = difficulty
       ? `Make the questions ${difficulty} difficulty for this level.`
       : '';
+    // Adaptive practice: the student recently got these specific things wrong,
+    // so prioritise testing the SAME underlying concepts (reworded, not copied).
+    const focusLine =
+      focusConcepts && focusConcepts.length
+        ? `The student recently struggled with these specific questions/concepts. Prioritise questions that test the same underlying concepts, reworded (do NOT copy them verbatim):\n${focusConcepts
+            .map((c, i) => `${i + 1}. ${c}`)
+            .join('\n')}`
+        : '';
 
     const system =
       'You are an expert exam setter for the Malawi school curriculum. You write clear, fair multiple-choice questions and return ONLY valid JSON.';
     const user = `Generate ${count} multiple-choice questions for a ${level} student (about ${ageHint} years old) in ${subject}. ${topicLine} ${examLine} ${difficultyLine}
+${focusLine}
 Rules:
 - Exactly 4 options per question, with exactly one correct answer.
 - Use simple, clear language suited to the student's level and Malawian context.
