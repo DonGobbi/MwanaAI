@@ -12,7 +12,7 @@ import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder, FiAlertTriangle } from 'react-icons/fi';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder, FiAlertTriangle, FiTrash2 } from 'react-icons/fi';
 
 // Tabs inside a class so the teacher sees one focused section at a time.
 const CLASS_TABS = [
@@ -396,11 +396,14 @@ const Teacher = () => {
   const [newSubject, setNewSubject] = useState('');
   const [newLevel, setNewLevel] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState('');
 
   const [active, setActive] = useState(null);
   const [tab, setTab] = useState('create');
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [insights, setInsights] = useState('');
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -424,6 +427,12 @@ const Teacher = () => {
   const createClass = async (e) => {
     e.preventDefault();
     if (!newSubject || !newLevel || !currentUser) return;
+    setCreateMsg('');
+    // Block duplicate (same subject + level) up front; also enforced in the service.
+    if (classes.some((c) => c.subject === newSubject && c.level === newLevel)) {
+      setCreateMsg(`You already have a ${getSubject(newSubject)?.label || newSubject} · ${getGradeLevel(newLevel)?.label || newLevel} class.`);
+      return;
+    }
     setCreating(true);
     try {
       await classService.createClass(currentUser, {
@@ -436,9 +445,24 @@ const Teacher = () => {
       setNewLevel('');
       loadClasses();
     } catch (err) {
-      console.error('Could not create class:', err);
+      setCreateMsg(err.message || 'Could not create class.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (!active) return;
+    setDeleting(true);
+    try {
+      await classService.deleteClass(active.id);
+      setActive(null);
+      setConfirmDelete(false);
+      loadClasses();
+    } catch (err) {
+      console.error('Could not delete class:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -450,6 +474,7 @@ const Teacher = () => {
     setMembers([]);
     setInsights('');
     setClassIntel(null);
+    setConfirmDelete(false);
     try {
       const [roster, classResults, assignments] = await Promise.all([
         classService.getMembers(cls.id),
@@ -527,9 +552,32 @@ const Teacher = () => {
     return (
       <div className="bg-gray-50 min-h-screen">
         <div className="container py-8 max-w-4xl">
-          <button onClick={() => setActive(null)} className="text-sm text-primary-600 hover:underline mb-4">
-            ← Back to classes
-          </button>
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => { setActive(null); setConfirmDelete(false); }} className="text-sm text-primary-600 hover:underline">
+              ← Back to classes
+            </button>
+            <button onClick={() => setConfirmDelete(true)}
+              className="text-sm text-gray-400 hover:text-red-600 inline-flex items-center gap-1 transition-colors">
+              <FiTrash2 className="w-4 h-4" /> Delete class
+            </button>
+          </div>
+
+          {confirmDelete && (
+            <div className="card p-4 mb-4 border border-red-200 bg-red-50 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-red-700">
+                Delete <strong>{active.name}</strong>? This removes the class and its assignments and can't be undone.
+              </p>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={() => setConfirmDelete(false)} disabled={deleting}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+                <button onClick={handleDeleteClass} disabled={deleting}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                  {deleting ? 'Deleting…' : 'Delete class'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{active.name}</h1>
@@ -668,12 +716,12 @@ const Teacher = () => {
             Pick the subject and level — we'll name the class and generate a join code for your students.
           </p>
           <form onSubmit={createClass} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)}
+            <select value={newSubject} onChange={(e) => { setNewSubject(e.target.value); setCreateMsg(''); }}
               className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
               <option value="">Subject</option>
               {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <select value={newLevel} onChange={(e) => setNewLevel(e.target.value)}
+            <select value={newLevel} onChange={(e) => { setNewLevel(e.target.value); setCreateMsg(''); }}
               className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
               <option value="">Level / Form</option>
               <optgroup label="Primary">
@@ -692,14 +740,16 @@ const Teacher = () => {
               {creating ? 'Creating…' : 'Create class'}
             </button>
           </form>
-          {newSubject && newLevel && (
+          {createMsg ? (
+            <p className="text-xs text-amber-600 mt-2">{createMsg}</p>
+          ) : newSubject && newLevel ? (
             <p className="text-xs text-gray-400 mt-2">
               New class:{' '}
               <span className="font-medium text-gray-600">
                 {getSubject(newSubject)?.label} · {getGradeLevel(newLevel)?.label}
               </span>
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* Classes */}

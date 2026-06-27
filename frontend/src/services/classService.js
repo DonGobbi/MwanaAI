@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 
 // Short, human-friendly class code (no easily confused characters).
 function generateCode() {
@@ -16,6 +16,11 @@ export const classService = {
   // A class is one subject taught at one level (e.g. Geography · Form 1).
   // Subject + level are set once here and inherited everywhere in the class.
   async createClass(teacher, { subject, subjectLabel, level, levelLabel }) {
+    // One class per subject+level per teacher — no duplicates.
+    const mine = await getDocs(query(collection(db, 'classes'), where('teacherId', '==', teacher.uid)));
+    if (mine.docs.some((d) => d.data().subject === subject && d.data().level === level)) {
+      throw new Error(`You already have a ${subjectLabel} · ${levelLabel} class.`);
+    }
     const id = doc(collection(db, 'classes')).id;
     const cls = {
       id,
@@ -36,6 +41,19 @@ export const classService = {
   async listClassesForTeacher(teacherId) {
     const snap = await getDocs(query(collection(db, 'classes'), where('teacherId', '==', teacherId)));
     return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+
+  // Delete a class. Also removes the teacher's assignments for it (the teacher
+  // owns those); student class_members reference it but are harmless if orphaned.
+  async deleteClass(classId) {
+    if (!classId) return;
+    try {
+      const a = await getDocs(query(collection(db, 'assignments'), where('classId', '==', classId)));
+      await Promise.all(a.docs.map((d) => deleteDoc(doc(db, 'assignments', d.id))));
+    } catch (err) {
+      /* best effort */
+    }
+    await deleteDoc(doc(db, 'classes', classId));
   },
 
   async getMembers(classId) {
