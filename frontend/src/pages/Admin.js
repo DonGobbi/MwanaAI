@@ -26,10 +26,13 @@ const ONBOARD_STEPS = [
   { icon: FiUsers, title: 'Enrol students', text: 'Into their class & subjects.' },
 ];
 
-const CopyButton = ({ email }) => {
+const CopyButton = ({ invite }) => {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    const link = `${window.location.origin}/signup?email=${encodeURIComponent(email)}`;
+    const link = emailService.inviteLink({
+      email: invite.email, role: invite.role, gradeLevel: invite.gradeLevel,
+      subjects: invite.subjects, schoolName: invite.schoolName,
+    });
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -54,6 +57,7 @@ const EmailButton = ({ invite, schoolName }) => {
       email: invite.email,
       role: invite.role,
       schoolName,
+      gradeLevel: invite.gradeLevel,
       gradeLabel: invite.gradeLabel || invite.gradeLevel,
       subjects: invite.subjects,
     });
@@ -259,7 +263,7 @@ const StudentInvites = ({ school, admin }) => {
     try {
       const gradeLabel = getGradeLevel(gradeLevel)?.label || gradeLevel;
       await inviteService.create(admin, school, { email, role: 'student', gradeLevel, gradeLabel, subjects });
-      const sent = await emailService.sendInvite({ email, role: 'student', schoolName: school.name, gradeLabel, subjects });
+      const sent = await emailService.sendInvite({ email, role: 'student', schoolName: school.name, gradeLevel, gradeLabel, subjects });
       setEmail(''); setGradeLevel(''); setSubjects([]); setMsg(sendNote(sent));
       load();
     } catch (err) {
@@ -333,7 +337,7 @@ const StudentInvites = ({ school, admin }) => {
               </div>
               <StatusBadge status={i.status} />
               <EmailButton invite={i} schoolName={school.name} />
-              <CopyButton email={i.email} />
+              <CopyButton invite={i} />
               <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
             </li>
           ))}
@@ -410,7 +414,7 @@ const RoleInvites = ({ school, admin, role, title, description, icon: Icon, plac
               <p className="text-sm font-medium text-gray-800 truncate flex-1 min-w-0">{i.email}</p>
               <StatusBadge status={i.status} />
               <EmailButton invite={i} schoolName={school.name} />
-              <CopyButton email={i.email} />
+              <CopyButton invite={i} />
               <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
             </li>
           ))}

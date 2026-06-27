@@ -3,7 +3,12 @@ import { Link, useNavigate, Navigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Logo from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
-import { GRADE_LEVELS } from '../config/curriculum';
+import { GRADE_LEVELS, getGradeLevel } from '../config/curriculum';
+
+const ROLE_LABELS = { student: 'Student', teacher: 'Teacher', parent: 'Parent', admin: 'School Admin' };
+// Roles a person may pick for themselves at signup. Elevated roles (admin) are
+// never granted from the URL — they come from the real invite on first sign-in.
+const SELF_ROLES = ['student', 'teacher', 'parent'];
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -16,16 +21,30 @@ const Signup = () => {
     confirmPassword: '',
     userType: 'student',
     gradeLevel: '',
+    subjects: [],
     agreeToTerms: false
   });
-  
+  // When arriving from an invite link, the role (and class/subjects for
+  // students) come from the URL — we then skip asking those questions.
+  const [invite, setInvite] = useState(null);
+
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Prefill the email when arriving from an admin invite link (/signup?email=).
+  // Pre-fill from an invite link (/signup?email=&role=&grade=&subjects=&school=).
   useEffect(() => {
-    const invited = new URLSearchParams(window.location.search).get('email');
-    if (invited) setFormData((prev) => ({ ...prev, email: invited }));
+    const p = new URLSearchParams(window.location.search);
+    const email = p.get('email');
+    const role = p.get('role');
+    const grade = p.get('grade') || '';
+    const subjects = (p.get('subjects') || '').split(',').filter(Boolean);
+    const school = p.get('school') || '';
+    setFormData((prev) => ({
+      ...prev,
+      ...(email ? { email } : {}),
+      ...(role ? { userType: SELF_ROLES.includes(role) ? role : 'student', gradeLevel: grade, subjects } : {}),
+    }));
+    if (role) setInvite({ role, gradeLevel: grade, gradeLabel: getGradeLevel(grade)?.label || grade, subjects, schoolName: school });
   }, []);
   
   const handleChange = (e) => {
@@ -68,7 +87,9 @@ const Signup = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (!formData.gradeLevel) {
+    // Only a student signing up on their own needs to pick a class — invited
+    // people (and non-students) get their class from the invite or not at all.
+    if (!invite && formData.userType === 'student' && !formData.gradeLevel) {
       newErrors.gradeLevel = 'Please select your class';
     }
 
@@ -110,7 +131,8 @@ const Signup = () => {
         lastName: formData.lastName,
         displayName: `${formData.firstName} ${formData.lastName}`,
         userType: formData.userType,
-        gradeLevel: formData.gradeLevel
+        gradeLevel: formData.gradeLevel,
+        subjects: formData.subjects || []
       };
 
       // Call the signup method from AuthContext
@@ -164,6 +186,19 @@ const Signup = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {invite && (
+            <div className="mb-6 bg-primary-50 border border-primary-100 rounded-lg p-4">
+              <p className="text-sm font-semibold text-primary-800">
+                You've been invited{invite.schoolName ? ` to ${invite.schoolName}` : ''} 🎉
+              </p>
+              <p className="text-sm text-primary-700 mt-0.5">
+                Joining as <strong>{ROLE_LABELS[invite.role] || invite.role}</strong>
+                {invite.role === 'student' && invite.gradeLabel ? ` · ${invite.gradeLabel}` : ''}
+                {invite.role === 'student' && invite.subjects.length ? ` · ${invite.subjects.length} subject${invite.subjects.length !== 1 ? 's' : ''}` : ''}
+                . Just set a password to finish.
+              </p>
+            </div>
+          )}
           {errors.general && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
               <div className="flex">
@@ -234,7 +269,8 @@ const Signup = () => {
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${errors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm`}
+                  readOnly={!!invite}
+                  className={`appearance-none block w-full px-3 py-2 border ${errors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm ${invite ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
                 />
                 {errors.email && (
                   <p className="mt-2 text-sm text-red-600">{errors.email}</p>
@@ -282,54 +318,58 @@ const Signup = () => {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="userType" className="block text-sm font-medium text-gray-700">
-                I am a
-              </label>
-              <div className="mt-1">
-                <select
-                  id="userType"
-                  name="userType"
-                  value={formData.userType}
-                  onChange={handleChange}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                >
-                  <option value="student">Student</option>
-                  <option value="teacher">Teacher</option>
-                  <option value="parent">Parent</option>
-                </select>
+            {!invite && (
+              <div>
+                <label htmlFor="userType" className="block text-sm font-medium text-gray-700">
+                  I am a
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="userType"
+                    name="userType"
+                    value={formData.userType}
+                    onChange={handleChange}
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  >
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="parent">Parent</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label htmlFor="gradeLevel" className="block text-sm font-medium text-gray-700">
-                Class / Form
-              </label>
-              <div className="mt-1">
-                <select
-                  id="gradeLevel"
-                  name="gradeLevel"
-                  value={formData.gradeLevel}
-                  onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${errors.gradeLevel ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm`}
-                >
-                  <option value="">Select your class</option>
-                  <optgroup label="Primary">
-                    {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
-                      <option key={g.value} value={g.value}>{g.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Secondary">
-                    {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => (
-                      <option key={g.value} value={g.value}>{g.label}</option>
-                    ))}
-                  </optgroup>
-                </select>
-                {errors.gradeLevel && (
-                  <p className="mt-2 text-sm text-red-600">{errors.gradeLevel}</p>
-                )}
+            {!invite && formData.userType === 'student' && (
+              <div>
+                <label htmlFor="gradeLevel" className="block text-sm font-medium text-gray-700">
+                  Class / Form
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="gradeLevel"
+                    name="gradeLevel"
+                    value={formData.gradeLevel}
+                    onChange={handleChange}
+                    className={`appearance-none block w-full px-3 py-2 border ${errors.gradeLevel ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm`}
+                  >
+                    <option value="">Select your class</option>
+                    <optgroup label="Primary">
+                      {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Secondary">
+                      {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  {errors.gradeLevel && (
+                    <p className="mt-2 text-sm text-red-600">{errors.gradeLevel}</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-center">
               <input
