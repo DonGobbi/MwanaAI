@@ -11,6 +11,7 @@ import {
   FiUsers,
   FiUserCheck,
   FiFolder,
+  FiLayers,
 } from 'react-icons/fi';
 
 const NAV = {
@@ -28,6 +29,7 @@ const NAV = {
       label: 'Practice',
       items: [
         { to: '/quiz', icon: FiEdit3, text: 'Practice' },
+        { to: '/flashcards', icon: FiLayers, text: 'Flashcards' },
         { to: '/progress', icon: FiBarChart2, text: 'Progress' },
       ],
     },
