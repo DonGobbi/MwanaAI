@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
 import Leaderboard from '../components/Leaderboard';
 import Badges from '../components/Badges';
+import LearningGoals from '../components/LearningGoals';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { computeBadges } from '../utils/badges';
 import { computeStreak } from '../utils/streak';
@@ -179,6 +180,9 @@ const Progress = () => {
 
             {/* Achievements — full width */}
             {hasActivity && <Badges badges={badges} />}
+
+            {/* Learning goals — full width */}
+            <LearningGoals userId={currentUser?.uid} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Main column */}

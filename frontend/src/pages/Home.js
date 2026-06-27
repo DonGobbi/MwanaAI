@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
 import { assignmentService } from '../services/assignmentService';
+import { goalService } from '../services/goalService';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
 import Onboarding, { ONBOARDED_KEY } from '../components/Onboarding';
@@ -190,6 +191,62 @@ const StudentAssignments = () => {
   );
 };
 
+// Gentle in-app reminder of the student's active learning goals.
+const GoalsReminder = () => {
+  const { currentUser } = useAuth();
+  const [goals, setGoals] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!currentUser) return;
+      try {
+        const all = await goalService.listForUser(currentUser.uid);
+        if (active) setGoals(all.filter((g) => !g.done).slice(0, 4));
+      } catch (err) {
+        /* ignore */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <div className="card p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <FiTarget className="text-primary-600" />
+          <h2 className="font-bold text-gray-900">Your goals</h2>
+        </div>
+        <Link to="/progress" className="text-sm text-primary-600 hover:underline">Manage</Link>
+      </div>
+      {goals.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          No active goals. <Link to="/progress" className="text-primary-600 hover:underline">Set one →</Link>
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {goals.map((g) => {
+            const overdue = g.targetDate && g.targetDate < today;
+            return (
+              <li key={g.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-gray-700 truncate">{g.title}</span>
+                {g.targetDate && (
+                  <span className={`text-xs flex-shrink-0 ${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                    {overdue ? 'Overdue' : 'Due'} {new Date(g.targetDate + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 // The full, data-rich student dashboard.
 const StudentHome = ({ firstName }) => {
   const { currentUser } = useAuth();
@@ -309,6 +366,8 @@ const StudentHome = ({ firstName }) => {
               </div>
             </div>
           )}
+
+          <GoalsReminder />
 
           <JoinClassCard />
         </div>

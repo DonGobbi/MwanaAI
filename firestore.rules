@@ -71,6 +71,13 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
     }
 
+    // Learning goals — private to the student who created them (query by userId).
+    match /goals/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
     // Class resources (shared library) — readable by any signed-in user (so a
     // `where classId ==` query is allowed, same model as classes/assignments/
     // quiz_results above); only the owning teacher can add or remove them.
