@@ -10,6 +10,7 @@ import {
   FiBarChart2,
   FiUsers,
   FiUserCheck,
+  FiFolder,
 } from 'react-icons/fi';
 
 const NAV = {
@@ -19,6 +20,7 @@ const NAV = {
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
         { to: '/learn', icon: FiBookOpen, text: 'Learn' },
+        { to: '/resources', icon: FiFolder, text: 'Resources' },
         { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },
       ],
     },

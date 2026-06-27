@@ -7,6 +7,7 @@ import { assignmentService } from '../services/assignmentService';
 import EmptyState from '../components/EmptyState';
 import Markdown from '../components/Markdown';
 import MaterialGenerator from '../components/MaterialGenerator';
+import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
@@ -519,6 +520,8 @@ const Teacher = () => {
               </p>
             )}
           </div>
+
+          <ClassResources cls={active} teacher={currentUser} />
 
           <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
 

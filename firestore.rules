@@ -70,5 +70,17 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
     }
+
+    // Class resources (shared library) — readable by the owning teacher and by
+    // students enrolled in the class (membership doc id is `classId_studentId`);
+    // only the owning teacher can add or remove them.
+    match /resources/{id} {
+      allow read: if signedIn() && (
+        resource.data.teacherId == request.auth.uid ||
+        exists(/databases/$(database)/documents/class_members/$(resource.data.classId + '_' + request.auth.uid))
+      );
+      allow create: if signedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.teacherId == request.auth.uid;
+    }
   }
 }
