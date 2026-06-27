@@ -8,6 +8,7 @@ import { goalService } from '../services/goalService';
 import { useCourses } from '../hooks/useCourses';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
+import { analyzeResults } from '../services/studentIntel';
 import {
   FiBookOpen,
   FiMessageCircle,
@@ -251,6 +252,35 @@ const GoalsReminder = () => {
   );
 };
 
+// "Revise next" — the one thing the AI suggests focusing on, from real scores.
+const ReviseNextCard = ({ focus }) => {
+  const tone =
+    focus.kind === 'master'
+      ? 'border-emerald-400'
+      : focus.kind === 'declining'
+      ? 'border-amber-400'
+      : 'border-primary-500';
+  return (
+    <div className={`card p-5 border-l-4 ${tone}`}>
+      <div className="flex items-center gap-2 mb-1">
+        <FiZap className="text-primary-600" />
+        <h2 className="font-bold text-gray-900">Revise next</h2>
+      </div>
+      <p className="text-sm text-gray-600 mb-3">
+        <span className="font-semibold text-gray-900">{focus.label}</span> — {focus.line}{' '}
+        <span className="text-gray-400">(avg {focus.avg}%)</span>
+      </p>
+      <div className="flex items-center gap-3">
+        <Link to={`/quiz?subject=${focus.subject}`}
+          className="inline-flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          Practise {focus.label} <FiArrowRight className="w-4 h-4" />
+        </Link>
+        <Link to="/progress" className="text-sm text-primary-600 hover:underline">See full study plan</Link>
+      </div>
+    </div>
+  );
+};
+
 // The full, data-rich student dashboard.
 const StudentHome = ({ firstName }) => {
   const { currentUser } = useAuth();
@@ -293,6 +323,7 @@ const StudentHome = ({ firstName }) => {
             streak: computeStreak(results),
             lessons: summary.lessonsCompleted,
             earnedBadges: badges.filter((b) => b.earned),
+            focus: analyzeResults(results).focus,
           });
         }
       } catch (err) {
@@ -305,7 +336,7 @@ const StudentHome = ({ firstName }) => {
     };
   }, [currentUser]);
 
-  const s = stats || { quizCount: 0, avg: 0, streak: 0, lessons: 0, earnedBadges: [] };
+  const s = stats || { quizCount: 0, avg: 0, streak: 0, lessons: 0, earnedBadges: [], focus: null };
 
   return (
     <>
@@ -331,6 +362,9 @@ const StudentHome = ({ firstName }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Revise next — personalised from real quiz scores */}
+          {s.focus && <ReviseNextCard focus={s.focus} />}
+
           {/* My courses */}
           <div>
             <div className="flex items-center justify-between mb-3">

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { quizService } from '../services/quizService';
 import { classService } from '../services/classService';
 import { aiInsights } from '../services/aiInsightsService';
+import { analyzeResults } from '../services/studentIntel';
 import { getGradeLevel } from '../config/curriculum';
 import { useCourses } from '../hooks/useCourses';
 import EmptyState from '../components/EmptyState';
@@ -102,20 +103,9 @@ const Progress = () => {
     setLoadingPlan(true);
     setStudyPlan('');
     try {
-      const map = {};
-      results.forEach((r) => {
-        const k = r.subjectLabel || r.subject || 'Other';
-        if (!map[k]) map[k] = { sum: 0, n: 0 };
-        map[k].sum += r.percentage || 0;
-        map[k].n += 1;
-      });
-      const subjectScores = Object.entries(map).map(([subject, v]) => ({
-        subject,
-        avg: Math.round(v.sum / v.n),
-        count: v.n,
-      }));
+      const summary = analyzeResults(results);
       const level = getGradeLevel(localStorage.getItem('mwanaai_grade_level'))?.label || 'school';
-      const plan = await aiInsights.studyPlan({ level, subjectScores });
+      const plan = await aiInsights.studyPlanSmart({ level, summary });
       setStudyPlan(plan);
     } catch (err) {
       setStudyPlan(`*${err.message || 'Could not build your study plan.'}*`);
@@ -137,8 +127,10 @@ const Progress = () => {
     bySubject[key].total += 1;
     bySubject[key].sum += r.percentage || 0;
   });
+  const trendBySubject = {};
+  analyzeResults(results).bySubject.forEach((s) => { trendBySubject[s.label] = s.trend; });
   const subjectRows = Object.entries(bySubject)
-    .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.total), count: v.total }))
+    .map(([name, v]) => ({ name, avg: Math.round(v.sum / v.total), count: v.total, trend: trendBySubject[name] || 'flat' }))
     .sort((a, b) => b.avg - a.avg);
 
   const streak = computeStreak(results);
@@ -194,7 +186,11 @@ const Progress = () => {
                     {subjectRows.map((s) => (
                       <div key={s.name} className="px-4 py-3">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-800">{s.name}</span>
+                          <span className="font-medium text-gray-800 flex items-center gap-1.5">
+                            {s.name}
+                            {s.trend === 'up' && <span title="Improving" className="text-green-600 text-xs">↑</span>}
+                            {s.trend === 'down' && <span title="Slipping" className="text-amber-600 text-xs">↓</span>}
+                          </span>
                           <span className="text-gray-500">{s.avg}% · {s.count} quiz{s.count > 1 ? 'zes' : ''}</span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2">

@@ -144,6 +144,16 @@ const Quiz = () => {
     );
     if (currentUser) {
       try {
+        // Capture the concepts missed (compact) so the study plan can name the
+        // exact gaps, not just the subject.
+        const missed = questions
+          .map((q, i) => ({ q, i }))
+          .filter(({ q, i }) => answers[i] !== q.correctIndex)
+          .slice(0, 8)
+          .map(({ q }) => ({
+            q: (q.question || '').slice(0, 140),
+            a: (q.options?.[q.correctIndex] || '').slice(0, 80),
+          }));
         await quizService.saveResult(currentUser.uid, {
           subject,
           subjectLabel: getSubject(subject)?.label || subject,
@@ -154,8 +164,9 @@ const Quiz = () => {
           score: finalScore,
           total,
           percentage: Math.round((finalScore / total) * 100),
+          ...(missed.length ? { missed } : {}),
           ...(assignmentRef.current
-            ? { assignmentId: assignmentRef.current.id, classId: assignmentRef.current.classId }
+            ? { assignmentId: assignmentRef.current.id, classId: assignmentRef.current.classId, topic: assignmentRef.current.topic || undefined }
             : {}),
         });
       } catch (err) {

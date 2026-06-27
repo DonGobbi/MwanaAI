@@ -147,6 +147,46 @@ In short Markdown: list the specific **topics/concepts to review** (grouped), gi
     );
   },
 
+  // A personalised study plan grounded in the student's subjects, trends and the
+  // exact questions they recently missed (Markdown). Sharper than studyPlan().
+  async studyPlanSmart({ level, summary }) {
+    const subjects = summary.bySubject
+      .map(
+        (s) =>
+          `- ${s.label}: average ${s.avg}% over ${s.count} quiz(zes)${
+            s.count >= 4 ? `, recently ${s.recentAvg}% (${s.trend})` : ''
+          }`
+      )
+      .join('\n');
+    const missed = summary.recentMissed.length
+      ? summary.recentMissed.map((m) => `- [${m.subject}] "${m.q}" (correct answer: ${m.a})`).join('\n')
+      : '(no specific missed questions recorded yet)';
+
+    return groqChat(
+      [
+        {
+          role: 'system',
+          content: `You are MwanaAI, a warm, encouraging study coach for a ${level} student in Malawi. You build short, practical, motivating study plans in Markdown grounded ONLY in the student's own data.`,
+        },
+        {
+          role: 'user',
+          content: `My quiz performance by subject (weakest first):
+${subjects}
+
+Specific questions I recently got wrong:
+${missed}
+
+Give me a plan in Markdown with these sections:
+**Focus first** — my 1-2 weakest areas, and where the missed questions are shown, name the exact concepts to revise.
+**This week** — 3-4 clear, doable steps.
+**Tips** — 2 quick study tips.
+Keep it short, specific and positive. Base everything ONLY on the data above.`,
+        },
+      ],
+      { maxTokens: 1100 }
+    );
+  },
+
   // A personalised study plan for a student based on their quiz averages (Markdown).
   async studyPlan({ level, subjectScores }) {
     const data = subjectScores
