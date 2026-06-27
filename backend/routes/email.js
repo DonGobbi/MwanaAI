@@ -57,7 +57,9 @@ router.post('/invite', async (req, res) => {
     return res.json({ sent: false, reason: 'email_not_configured' });
   }
 
-  const from = process.env.RESEND_FROM || 'MwanaAI <onboarding@resend.dev>';
+  // Accept either RESEND_FROM or FROM_EMAIL; a bare address gets a friendly name.
+  const fromRaw = process.env.RESEND_FROM || process.env.FROM_EMAIL || 'onboarding@resend.dev';
+  const from = fromRaw.includes('<') ? fromRaw : `MwanaAI <${fromRaw}>`;
   const { subject, html, text } = buildEmail({ role, schoolName, gradeLabel, subjects, link });
 
   try {
