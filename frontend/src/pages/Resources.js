@@ -5,12 +5,16 @@ import { classService } from '../services/classService';
 import { resourceService } from '../services/resourceService';
 import EmptyState from '../components/EmptyState';
 import ResourceAI from '../components/ResourceAI';
+import Markdown from '../components/Markdown';
 import { getGradeLevel } from '../config/curriculum';
 import { PageLoader } from '../components/Spinner';
 import { FiFolder, FiFileText, FiImage, FiYoutube, FiChevronDown, FiExternalLink } from 'react-icons/fi';
 
 const KIND_ICON = { image: FiImage, youtube: FiYoutube, file: FiFileText, text: FiFileText };
-const KIND_LABEL = { youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document' };
+const KIND_LABEL = {
+  youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document',
+  lesson: 'Lesson plan', quiz: 'Quiz', notes: 'Revision notes', questions: 'Exam questions',
+};
 
 const ResourceRow = ({ r, level }) => {
   const [open, setOpen] = useState(false);
@@ -39,8 +43,8 @@ const ResourceRow = ({ r, level }) => {
             </a>
           )}
           {r.text ? (
-            <div className="max-h-72 overflow-y-auto rounded-lg bg-gray-50 border border-gray-100 p-3">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{r.text}</p>
+            <div className="max-h-80 overflow-y-auto rounded-lg bg-gray-50 border border-gray-100 p-3">
+              <Markdown content={r.text} />
             </div>
           ) : (
             <p className="text-sm text-gray-400">No readable text for this resource.</p>

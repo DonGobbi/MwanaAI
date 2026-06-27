@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { materialService, OUTPUT_TYPES } from '../services/materialService';
+import { resourceService } from '../services/resourceService';
 import { extractFromFile } from '../utils/extractText';
 import { youtubeService } from '../services/youtubeService';
 import { useDictation } from '../hooks/useDictation';
@@ -7,13 +8,14 @@ import { SUBJECTS, GRADE_LEVELS, getSubject, getGradeLevel } from '../config/cur
 import { printDoc } from '../utils/printReport';
 import Markdown from './Markdown';
 import Spinner from './Spinner';
-import { FiUploadCloud, FiFileText, FiImage, FiX, FiMic, FiPrinter, FiZap, FiYoutube } from 'react-icons/fi';
+import { FiUploadCloud, FiFileText, FiImage, FiX, FiMic, FiPrinter, FiZap, FiYoutube, FiSave } from 'react-icons/fi';
 
 const KIND_ICON = { image: FiImage, youtube: FiYoutube };
 
 // Generate lesson plans / quizzes / notes GROUNDED in the teacher's own
 // materials — uploaded textbook pages, the syllabus, screenshots or notes.
-const MaterialGenerator = () => {
+// Generated output can be saved to a class as a shareable resource.
+const MaterialGenerator = ({ classes = [], teacher }) => {
   const [subject, setSubject] = useState('');
   const [level, setLevel] = useState('form-2');
   const [outputType, setOutputType] = useState('lesson');
@@ -31,6 +33,12 @@ const MaterialGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
+
+  // Save generated output to a class as a shareable resource.
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveClass, setSaveClass] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
 
   const fileRef = useRef(null);
   const dictation = useDictation({
@@ -105,10 +113,35 @@ const MaterialGenerator = () => {
         materials: all,
       });
       setResult(out);
+      // Prefill a sensible title for saving to a class.
+      const subjLabel = getSubject(subject)?.label || subject;
+      const label = OUTPUT_TYPES.find((o) => o.value === outputType)?.label || 'Resource';
+      setSaveTitle(subjLabel ? `${label} — ${subjLabel}` : label);
+      setSaveMsg('');
     } catch (err) {
       setError(err.message || 'Could not generate that.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveToClass = async () => {
+    const cls = (classes || []).find((c) => c.id === saveClass);
+    if (!cls || !result) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      await resourceService.add(teacher, cls, {
+        title: saveTitle.trim() || outputLabel,
+        kind: outputType, // lesson | quiz | notes | questions
+        sourceName: '',
+        text: result,
+      });
+      setSaveMsg(`Saved to ${cls.name} ✓`);
+    } catch (err) {
+      setSaveMsg(err.message || 'Could not save.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -256,6 +289,32 @@ const MaterialGenerator = () => {
               <FiPrinter /> Print / PDF
             </button>
           </div>
+
+          {/* Save to a class as a shareable resource */}
+          {classes.length > 0 ? (
+            <div className="mb-4 bg-primary-50 rounded-lg p-3 flex flex-wrap items-end gap-2">
+              <div className="flex-1 min-w-[180px]">
+                <label className="block text-xs text-gray-500 mb-1">Save to a class as a resource</label>
+                <input value={saveTitle} onChange={(e) => setSaveTitle(e.target.value)} placeholder="Title"
+                  className="w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+              </div>
+              <select value={saveClass} onChange={(e) => setSaveClass(e.target.value)}
+                className="rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                <option value="">Choose class</option>
+                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button onClick={saveToClass} disabled={saving || !saveClass || !saveTitle.trim()}
+                className="bg-secondary-600 hover:bg-secondary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5 transition-colors">
+                {saving ? <Spinner className="w-4 h-4" /> : <><FiSave /> Save to class</>}
+              </button>
+              {saveMsg && (
+                <span className={`text-xs w-full ${saveMsg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{saveMsg}</span>
+              )}
+            </div>
+          ) : (
+            <p className="mb-4 text-xs text-gray-400">Create a class to save this for your students.</p>
+          )}
+
           <Markdown content={result} />
         </div>
       )}

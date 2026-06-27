@@ -10,7 +10,10 @@ import {
 } from 'react-icons/fi';
 
 const KIND_ICON = { image: FiImage, youtube: FiYoutube, file: FiFileText, text: FiFileText };
-const KIND_LABEL = { youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document' };
+const KIND_LABEL = {
+  youtube: 'Video transcript', image: 'Image', text: 'Notes', file: 'Document',
+  lesson: 'Lesson plan', quiz: 'Quiz', notes: 'Revision notes', questions: 'Exam questions',
+};
 
 function timeAgo(ts) {
   if (!ts) return '';
