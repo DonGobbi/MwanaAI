@@ -50,6 +50,53 @@ Write a brief report with these Markdown sections: **Summary**, **Students who m
     );
   },
 
+  // Class analysis SCOPED to this class's subject, focused on the specific
+  // topics students are struggling with (not overall cross-subject averages).
+  async classTopicInsights({ className, subject, level, topicStats, studentWeak }) {
+    const topics = topicStats
+      .map(
+        (t) =>
+          `- ${t.topic}: average ${t.avg}% over ${t.attempts} attempt(s) by ${t.students} student(s)${
+            t.fails ? `, ${t.fails} score(s) below 50%` : ''
+          }`
+      )
+      .join('\n');
+    const students = studentWeak.length
+      ? studentWeak
+          .map((s) => `- ${s.name}: weak in ${s.weak.map((w) => `${w.topic} (${w.avg}%)`).join(', ')}`)
+          .join('\n')
+      : '(no individual weak spots stand out yet)';
+
+    return groqChat(
+      [
+        {
+          role: 'system',
+          content: `You are a supportive teaching assistant for a ${subject || 'subject'} class at ${
+            level || 'school'
+          } level in Malawi. You analyse how this class is doing IN THIS SUBJECT and point to the exact topics that need attention. Be specific, practical and encouraging.`,
+        },
+        {
+          role: 'user',
+          content: `Class: ${className} (${subject || 'subject'}${level ? `, ${level}` : ''}).
+
+Performance by topic (weakest first):
+${topics}
+
+Students with weak topics:
+${students}
+
+Write a short report in Markdown with these sections:
+**How the class is doing** — 1-2 sentences on this subject.
+**Topics to re-teach** — the weakest topics and why students likely struggled.
+**Students who need attention** — name them and the specific topic.
+**Next steps** — 2-3 concrete actions (e.g. re-teach X, assign a focused quiz on Y).
+Base everything ONLY on the data above. If a section has no data, say so briefly.`,
+        },
+      ],
+      { maxTokens: 1100 }
+    );
+  },
+
   // A teacher-facing recommendation for how to help one specific student.
   async studentRecommendation({ name, level, subjectScores }) {
     const data =

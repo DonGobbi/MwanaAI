@@ -363,13 +363,73 @@ const Teacher = () => {
     setLoadingInsights(true);
     setInsights('');
     try {
-      const rows = members.map((m) => ({
-        name: m.studentName,
-        quizzes: m.summary.quizCount,
-        avg: m.summary.avgScore,
-        lessons: m.summary.lessonsCompleted,
-      }));
-      const result = await aiInsights.classInsights({ className: active.name, rows });
+      // Topics come from this class's assignments; results carry the assignmentId.
+      const assignments = await assignmentService.listForClass(active.id);
+      const topicOf = {};
+      assignments.forEach((a) => {
+        topicOf[a.id] = (a.topic && a.topic.trim()) || a.title || 'General';
+      });
+
+      const results = await quizService.listByClass(active.id);
+      if (results.length === 0) {
+        setInsights(
+          'No quiz data for this class yet. Assign a quiz on a topic (Assignments tab) — once students take it, MwanaAI will show which topics the class is struggling with.'
+        );
+        return;
+      }
+
+      const nameById = {};
+      members.forEach((m) => {
+        nameById[m.studentId] = m.studentName;
+      });
+
+      // Aggregate performance by topic (weakest first).
+      const byTopic = {};
+      results.forEach((r) => {
+        const topic = topicOf[r.assignmentId] || 'General';
+        if (!byTopic[topic]) byTopic[topic] = { attempts: 0, sum: 0, students: new Set(), fails: 0 };
+        const t = byTopic[topic];
+        t.attempts += 1;
+        t.sum += r.percentage || 0;
+        t.students.add(r.userId);
+        if ((r.percentage || 0) < 50) t.fails += 1;
+      });
+      const topicStats = Object.entries(byTopic)
+        .map(([topic, v]) => ({
+          topic,
+          avg: Math.round(v.sum / v.attempts),
+          attempts: v.attempts,
+          students: v.students.size,
+          fails: v.fails,
+        }))
+        .sort((a, b) => a.avg - b.avg);
+
+      // Per-student weak topics (below 60%).
+      const byStudent = {};
+      results.forEach((r) => {
+        const topic = topicOf[r.assignmentId] || 'General';
+        if (!byStudent[r.userId]) byStudent[r.userId] = {};
+        if (!byStudent[r.userId][topic]) byStudent[r.userId][topic] = { sum: 0, n: 0 };
+        byStudent[r.userId][topic].sum += r.percentage || 0;
+        byStudent[r.userId][topic].n += 1;
+      });
+      const studentWeak = Object.entries(byStudent)
+        .map(([sid, topics]) => ({
+          name: nameById[sid] || 'A student',
+          weak: Object.entries(topics)
+            .map(([t, v]) => ({ topic: t, avg: Math.round(v.sum / v.n) }))
+            .filter((x) => x.avg < 60)
+            .sort((a, b) => a.avg - b.avg),
+        }))
+        .filter((s) => s.weak.length);
+
+      const result = await aiInsights.classTopicInsights({
+        className: active.name,
+        subject: active.subjectLabel,
+        level: active.levelLabel,
+        topicStats,
+        studentWeak,
+      });
       setInsights(result);
     } catch (err) {
       setInsights(`*${err.message || 'Could not analyse the class.'}*`);
@@ -444,7 +504,8 @@ const Teacher = () => {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 mt-2">
-                    Get an AI summary of how this class is doing, who needs help, and what to teach next.
+                    See how this {active.subjectLabel || 'class'} class is doing by <strong>topic</strong> — which
+                    topics to re-teach and which students need attention. Based on the quizzes you assign.
                   </p>
                 )}
               </div>

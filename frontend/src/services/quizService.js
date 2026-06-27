@@ -126,4 +126,13 @@ Return JSON exactly in this shape:
     const snap = await getDocs(q);
     return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
+
+  // All results tied to one class (assignment quizzes carry the classId) — used
+  // by the teacher to analyse how the class is doing in this subject, by topic.
+  async listByClass(classId) {
+    if (!classId) return [];
+    const q = query(collection(db, 'quiz_results'), where('classId', '==', classId));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => d.data());
+  },
 };
