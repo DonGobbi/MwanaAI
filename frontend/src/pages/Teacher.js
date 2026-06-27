@@ -363,11 +363,30 @@ const Teacher = () => {
     setMembers([]);
     setInsights('');
     try {
-      const roster = await classService.getMembers(cls.id);
-      const withProgress = await Promise.all(
-        roster.map(async (m) => ({ ...m, summary: await classService.getStudentSummary(m.studentId) }))
-      );
-      setMembers(withProgress);
+      const [roster, classResults] = await Promise.all([
+        classService.getMembers(cls.id),
+        quizService.listByClass(cls.id),
+      ]);
+      // Per-student stats scoped to THIS class only (assignment quizzes carry classId).
+      const perStudent = {};
+      classResults.forEach((r) => {
+        const s = perStudent[r.userId] || (perStudent[r.userId] = { n: 0, sum: 0, last: 0 });
+        s.n += 1;
+        s.sum += r.percentage || 0;
+        s.last = Math.max(s.last, r.createdAt || 0);
+      });
+      const withStats = roster.map((m) => {
+        const s = perStudent[m.studentId];
+        return {
+          ...m,
+          classStats: {
+            quizCount: s ? s.n : 0,
+            avgScore: s && s.n ? Math.round(s.sum / s.n) : null,
+            lastActive: s ? s.last : null,
+          },
+        };
+      });
+      setMembers(withStats);
     } catch (err) {
       console.error('Could not load roster:', err);
     } finally {
@@ -535,13 +554,13 @@ const Teacher = () => {
                 </div>
               ) : (
                 <div className="card overflow-hidden">
+                  <p className="text-xs text-gray-400 px-4 pt-3">Quizzes &amp; averages are for this class only.</p>
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                       <tr>
                         <th className="text-left px-4 py-2">Student</th>
                         <th className="text-center px-2 py-2">Quizzes</th>
                         <th className="text-center px-2 py-2">Avg</th>
-                        <th className="text-center px-2 py-2">Lessons</th>
                         <th className="text-right px-4 py-2">Active</th>
                       </tr>
                     </thead>
@@ -553,18 +572,17 @@ const Teacher = () => {
                             <p className="font-medium text-gray-800">{m.studentName}</p>
                             <p className="text-xs text-gray-400">{m.studentEmail}</p>
                           </td>
-                          <td className="text-center px-2 py-3 text-gray-600">{m.summary.quizCount}</td>
+                          <td className="text-center px-2 py-3 text-gray-600">{m.classStats.quizCount}</td>
                           <td className="text-center px-2 py-3">
                             <span className={`font-semibold ${
-                              m.summary.avgScore == null ? 'text-gray-300'
-                              : m.summary.avgScore >= 80 ? 'text-green-600'
-                              : m.summary.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
+                              m.classStats.avgScore == null ? 'text-gray-300'
+                              : m.classStats.avgScore >= 80 ? 'text-green-600'
+                              : m.classStats.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
                             }`}>
-                              {m.summary.avgScore == null ? '—' : `${m.summary.avgScore}%`}
+                              {m.classStats.avgScore == null ? '—' : `${m.classStats.avgScore}%`}
                             </span>
                           </td>
-                          <td className="text-center px-2 py-3 text-gray-600">{m.summary.lessonsCompleted}</td>
-                          <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.summary.lastActive)}</td>
+                          <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.classStats.lastActive)}</td>
                         </tr>
                       ))}
                     </tbody>
