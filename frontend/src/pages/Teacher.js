@@ -11,7 +11,15 @@ import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
 import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
-import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus } from 'react-icons/fi';
+import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder } from 'react-icons/fi';
+
+// Tabs inside a class so the teacher sees one focused section at a time.
+const CLASS_TABS = [
+  { id: 'create', label: 'Create', icon: FiZap },
+  { id: 'resources', label: 'Resources', icon: FiFolder },
+  { id: 'assignments', label: 'Assignments', icon: FiClipboard },
+  { id: 'students', label: 'Students', icon: FiUsers },
+];
 
 function timeAgo(ts) {
   if (!ts) return 'never';
@@ -288,6 +296,7 @@ const Teacher = () => {
   const [creating, setCreating] = useState(false);
 
   const [active, setActive] = useState(null);
+  const [tab, setTab] = useState('create');
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
@@ -332,6 +341,7 @@ const Teacher = () => {
 
   const openClass = async (cls) => {
     setActive(cls);
+    setTab('create');
     setSelectedStudent(null);
     setLoadingMembers(true);
     setMembers([]);
@@ -377,7 +387,7 @@ const Teacher = () => {
   if (active) {
     return (
       <div className="bg-gray-50 min-h-screen">
-        <div className="container py-8 max-w-3xl">
+        <div className="container py-8 max-w-4xl">
           <button onClick={() => setActive(null)} className="text-sm text-primary-600 hover:underline mb-4">
             ← Back to classes
           </button>
@@ -393,79 +403,98 @@ const Teacher = () => {
             </div>
           </div>
 
-          <ClassResources cls={active} teacher={currentUser} />
-
-          <ClassGenerator cls={active} teacher={currentUser} />
-
-          <Assignments cls={active} teacher={currentUser} memberCount={members.length} />
-
-          {/* AI Class Insights */}
-          <div className="card p-5 mb-5">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <FiBarChart2 className="text-primary-600" />
-                <h2 className="font-bold text-gray-900">AI Class Insights</h2>
-              </div>
-              <button onClick={analyzeClass} disabled={loadingMembers || loadingInsights}
-                className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                {loadingInsights ? <Spinner className="w-4 h-4" label="Analysing…" /> : '✨ Analyse class'}
+          {/* Tabs */}
+          <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
+            {CLASS_TABS.map((t) => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                  tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}>
+                <t.icon className="w-4 h-4" /> {t.label}
+                {t.id === 'students' && members.length > 0 && (
+                  <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5">{members.length}</span>
+                )}
               </button>
-            </div>
-            {insights ? (
-              <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
-                <Markdown content={insights} />
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 mt-2">
-                Get an AI summary of how this class is doing, who needs help, and what to teach next.
-              </p>
-            )}
+            ))}
           </div>
 
-          {loadingMembers ? (
-            <PageLoader label="Loading students…" />
-          ) : members.length === 0 ? (
-            <div className="card p-6">
-              <EmptyState compact icon={FiUsers} title="No students yet"
-                description={`Share the code ${active.code} with your class so students can join.`} />
-            </div>
-          ) : (
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                  <tr>
-                    <th className="text-left px-4 py-2">Student</th>
-                    <th className="text-center px-2 py-2">Quizzes</th>
-                    <th className="text-center px-2 py-2">Avg</th>
-                    <th className="text-center px-2 py-2">Lessons</th>
-                    <th className="text-right px-4 py-2">Active</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {members.map((m) => (
-                    <tr key={m.id} onClick={() => setSelectedStudent(m)}
-                      className="cursor-pointer hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-800">{m.studentName}</p>
-                        <p className="text-xs text-gray-400">{m.studentEmail}</p>
-                      </td>
-                      <td className="text-center px-2 py-3 text-gray-600">{m.summary.quizCount}</td>
-                      <td className="text-center px-2 py-3">
-                        <span className={`font-semibold ${
-                          m.summary.avgScore == null ? 'text-gray-300'
-                          : m.summary.avgScore >= 80 ? 'text-green-600'
-                          : m.summary.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
-                        }`}>
-                          {m.summary.avgScore == null ? '—' : `${m.summary.avgScore}%`}
-                        </span>
-                      </td>
-                      <td className="text-center px-2 py-3 text-gray-600">{m.summary.lessonsCompleted}</td>
-                      <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.summary.lastActive)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {tab === 'create' && <ClassGenerator cls={active} teacher={currentUser} />}
+
+          {tab === 'resources' && <ClassResources cls={active} teacher={currentUser} />}
+
+          {tab === 'assignments' && <Assignments cls={active} teacher={currentUser} memberCount={members.length} />}
+
+          {tab === 'students' && (
+            <>
+              {/* AI Class Insights */}
+              <div className="card p-5 mb-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <FiBarChart2 className="text-primary-600" />
+                    <h2 className="font-bold text-gray-900">AI Class Insights</h2>
+                  </div>
+                  <button onClick={analyzeClass} disabled={loadingMembers || loadingInsights}
+                    className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    {loadingInsights ? <Spinner className="w-4 h-4" label="Analysing…" /> : '✨ Analyse class'}
+                  </button>
+                </div>
+                {insights ? (
+                  <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
+                    <Markdown content={insights} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Get an AI summary of how this class is doing, who needs help, and what to teach next.
+                  </p>
+                )}
+              </div>
+
+              {loadingMembers ? (
+                <PageLoader label="Loading students…" />
+              ) : members.length === 0 ? (
+                <div className="card p-6">
+                  <EmptyState compact icon={FiUsers} title="No students yet"
+                    description={`Share the code ${active.code} with your class so students can join.`} />
+                </div>
+              ) : (
+                <div className="card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                      <tr>
+                        <th className="text-left px-4 py-2">Student</th>
+                        <th className="text-center px-2 py-2">Quizzes</th>
+                        <th className="text-center px-2 py-2">Avg</th>
+                        <th className="text-center px-2 py-2">Lessons</th>
+                        <th className="text-right px-4 py-2">Active</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {members.map((m) => (
+                        <tr key={m.id} onClick={() => setSelectedStudent(m)}
+                          className="cursor-pointer hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-800">{m.studentName}</p>
+                            <p className="text-xs text-gray-400">{m.studentEmail}</p>
+                          </td>
+                          <td className="text-center px-2 py-3 text-gray-600">{m.summary.quizCount}</td>
+                          <td className="text-center px-2 py-3">
+                            <span className={`font-semibold ${
+                              m.summary.avgScore == null ? 'text-gray-300'
+                              : m.summary.avgScore >= 80 ? 'text-green-600'
+                              : m.summary.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
+                            }`}>
+                              {m.summary.avgScore == null ? '—' : `${m.summary.avgScore}%`}
+                            </span>
+                          </td>
+                          <td className="text-center px-2 py-3 text-gray-600">{m.summary.lessonsCompleted}</td>
+                          <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.summary.lastActive)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
