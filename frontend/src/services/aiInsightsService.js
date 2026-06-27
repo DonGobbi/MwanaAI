@@ -150,6 +150,48 @@ In short Markdown: list the specific **topics/concepts to review** (grouped), gi
     );
   },
 
+  // A warm, jargon-free progress note for a PARENT about their child, grounded
+  // in the child's quiz data, with simple things they can do at home (Markdown).
+  async parentSummary({ childName, level, summary }) {
+    const name = childName || 'your child';
+    const subjects = summary.bySubject.length
+      ? summary.bySubject
+          .map(
+            (s) =>
+              `- ${s.label}: average ${s.avg}%${s.count >= 4 ? `, recently ${s.recentAvg}% (${s.trend})` : ''} over ${s.count} quiz(zes)`
+          )
+          .join('\n')
+      : '(no quizzes taken yet)';
+    const missed = summary.recentMissed.length
+      ? summary.recentMissed.slice(0, 8).map((m) => `- [${m.subject}] ${m.q}`).join('\n')
+      : '';
+
+    return groqChat(
+      [
+        {
+          role: 'system',
+          content: `You are MwanaAI, writing a warm, jargon-free progress note for the PARENT of a ${
+            level || 'school'
+          } child in Malawi. Speak to the parent directly ("your child"). Avoid technical terms. Be encouraging and practical, suggesting things a parent can do at home even if they are not an expert in the subject.`,
+        },
+        {
+          role: 'user',
+          content: `Child: ${name}.
+Quiz performance by subject (weakest first):
+${subjects}
+${missed ? `\nSome things they recently got wrong:\n${missed}\n` : ''}
+Write a short note in Markdown with these sections:
+**How ${name} is doing** — 1-2 plain sentences.
+**Doing well** — their stronger subjects.
+**Working on** — the areas to improve, gently.
+**How you can help at home** — 2-3 simple, specific things a parent can do.
+Base everything ONLY on the data above. If there is little data, say so kindly and encourage regular practice.`,
+        },
+      ],
+      { maxTokens: 900 }
+    );
+  },
+
   // A personalised study plan grounded in the student's subjects, trends and the
   // exact questions they recently missed (Markdown). Sharper than studyPlan().
   async studyPlanSmart({ level, summary }) {

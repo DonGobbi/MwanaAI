@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { classService } from '../services/classService';
+import { quizService } from '../services/quizService';
+import { aiInsights } from '../services/aiInsightsService';
+import { analyzeResults } from '../services/studentIntel';
+import { getGradeLevel } from '../config/curriculum';
 import { printStudentReport } from '../utils/printReport';
+import Markdown from '../components/Markdown';
 import Spinner from '../components/Spinner';
-import { FiPrinter } from 'react-icons/fi';
+import { FiPrinter, FiZap } from 'react-icons/fi';
 
 const STORAGE_KEY = 'mwanaai_child_email';
 
@@ -10,8 +15,13 @@ const ParentChild = () => {
   const [email, setEmail] = useState('');
   const [child, setChild] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // AI parent summary
+  const [aiNote, setAiNote] = useState('');
+  const [loadingNote, setLoadingNote] = useState(false);
 
   const lookup = async (value) => {
     const target = (value ?? email).trim();
@@ -23,6 +33,8 @@ const ParentChild = () => {
     setLoading(true);
     setChild(null);
     setSummary(null);
+    setResults([]);
+    setAiNote('');
     try {
       const found = await classService.findStudentByEmail(target);
       if (!found) {
@@ -31,11 +43,34 @@ const ParentChild = () => {
       }
       setChild(found);
       localStorage.setItem(STORAGE_KEY, target);
-      setSummary(await classService.getStudentSummary(found.uid));
+      const [sum, all] = await Promise.all([
+        classService.getStudentSummary(found.uid),
+        quizService.listResults(found.uid),
+      ]);
+      setSummary(sum);
+      setResults(all);
     } catch (err) {
       setError(err.message || 'Could not load progress. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getAiNote = async () => {
+    if (!child) return;
+    setLoadingNote(true);
+    setAiNote('');
+    try {
+      const note = await aiInsights.parentSummary({
+        childName: (child.displayName || 'your child').split(' ')[0],
+        level: getGradeLevel(child.gradeLevel)?.label || 'school',
+        summary: analyzeResults(results),
+      });
+      setAiNote(note);
+    } catch (err) {
+      setAiNote(`*${err.message || 'Could not build the summary.'}*`);
+    } finally {
+      setLoadingNote(false);
     }
   };
 
@@ -121,6 +156,29 @@ const ParentChild = () => {
                   <p className="text-xs text-gray-500">Lessons done</p>
                 </div>
               </div>
+            </div>
+
+            {/* AI parent summary — plain language, with how to help at home */}
+            <div className="card p-5 mb-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <FiZap className="text-primary-600" />
+                  <h2 className="font-bold text-gray-900">How is my child doing?</h2>
+                </div>
+                <button onClick={getAiNote} disabled={loadingNote || summary.quizCount === 0}
+                  className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {loadingNote ? <Spinner className="w-4 h-4" label="Thinking…" /> : aiNote ? 'Refresh' : '✨ Get a summary'}
+                </button>
+              </div>
+              {aiNote ? (
+                <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in"><Markdown content={aiNote} /></div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">
+                  {summary.quizCount === 0
+                    ? 'Once your child takes a few quizzes, MwanaAI can summarise how they are doing and how you can help at home.'
+                    : 'Get a plain-language summary of your child’s progress — what they’re doing well, what to work on, and simple ways to help at home.'}
+                </p>
+              )}
             </div>
 
             {summary.recent.length > 0 && (
