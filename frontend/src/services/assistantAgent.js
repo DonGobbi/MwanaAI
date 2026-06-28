@@ -221,7 +221,12 @@ const TOOLS = {
   async invite_user(args, viewer) {
     const role = normalizeRole(args.role);
     if (!['admin', 'teacher', 'student', 'parent'].includes(role)) return { error: 'Role must be a school admin, teacher, student or parent.' };
-    if (!args.email || !args.email.includes('@')) return { error: `A valid email address is required to invite a ${ROLE_LABEL[role] || role}. What is their email?` };
+    if (!args.email || !args.email.includes('@')) return { error: `A valid email address is required to invite a ${ROLE_LABEL[role] || role}. Please ask the user for their email address.` };
+    // Hard guard against a fabricated email: the address MUST appear verbatim in
+    // what the user actually wrote this turn. If not, refuse and ask for it.
+    if (!(viewer.userText || '').toLowerCase().includes(args.email.trim().toLowerCase())) {
+      return { error: `You did not provide an email address for this person. Do NOT invent one — ask the user: "What is the email address of the ${ROLE_LABEL[role] || role} you want to invite to ${args.school}?"` };
+    }
     const s = await findSchool(args.school, viewer);
     if (!s) return { error: `No school matching "${args.school}". Which school should they join?` };
     return { proposal: { type: 'invite_user', schoolId: s.id, schoolName: s.name, email: args.email.trim().toLowerCase(), role, summary: `Invite ${args.email.trim().toLowerCase()} as a ${ROLE_LABEL[role] || role} to ${s.name}`, impact: 'an invitation email will be sent to them', confirmLabel: 'Send invite' } };
@@ -355,6 +360,7 @@ function systemPrompt(viewer) {
   return `You are the operations assistant for MwanaAI, an education platform for schools in Malawi. ${scope}
 You are speaking with ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} (${ROLE_LABEL[viewer.role] || viewer.role}); when they say "me", "I" or "my", they mean this person.
 You have tools that read LIVE data from the database. Always CALL the tools to get facts — never guess, invent or rely on memory.
+NEVER fabricate or auto-generate any value the user did not give you — above all, NEVER invent an email address, a person's name, or an ID. If an action needs a detail you were not given (for example, the email address of the person to invite), do NOT call the action tool with a guessed value: STOP and ASK the user to provide that exact detail.
 How to choose tools:
 - If the request mentions NAMES, a LIST of people, emails, or "everyone"/"everything", you MUST call find_people to fetch the actual people. Counts from get_stats are NOT enough — get_stats has no names.
 - For a "full summary of everything", call find_people (the people, with names), get_schools (schools, classrooms, subjects) AND get_stats (totals) before answering, then list the actual names.
@@ -371,6 +377,9 @@ export async function runPlatformAssistant({ question, viewer }) {
     { role: 'user', content: question },
   ];
   let pendingAction = null; // an action awaiting the user's confirmation
+  // Tools get the viewer plus the exact text the user wrote this turn, so an
+  // action tool can refuse values (e.g. an email) the user never actually gave.
+  const ctx = { ...viewer, userText: question };
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const msg = await groqTools(messages, TOOL_DEFS, { maxTokens: 1200 });
@@ -388,7 +397,7 @@ export async function runPlatformAssistant({ question, viewer }) {
         // tool a plain object.
         let args = {};
         try { args = JSON.parse(call.function?.arguments || '{}') || {}; } catch (_) { args = {}; }
-        result = fn ? await fn(args, viewer) : { error: `unknown tool ${call.function?.name}` };
+        result = fn ? await fn(args, ctx) : { error: `unknown tool ${call.function?.name}` };
       } catch (err) {
         result = { error: err.message };
       }
