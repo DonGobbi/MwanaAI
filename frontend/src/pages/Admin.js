@@ -72,14 +72,6 @@ const EmailButton = ({ invite, schoolName }) => {
   );
 };
 
-const StatusBadge = ({ status }) => (
-  <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-    status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-  }`}>
-    {status === 'accepted' ? 'Joined' : 'Pending'}
-  </span>
-);
-
 // Lifecycle badge for an actual account (vs. an invite).
 const ACCOUNT_STATUS_STYLES = {
   active: 'bg-green-100 text-green-700',
@@ -93,6 +85,82 @@ const AccountStatusBadge = ({ status }) => {
     <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${ACCOUNT_STATUS_STYLES[s] || 'bg-gray-100 text-gray-600'}`}>
       {s}
     </span>
+  );
+};
+
+// Pending invitations only — people who've joined move to the accounts list.
+// Searchable + paginated so it never becomes an endless scroll.
+const INVITES_PAGE_SIZE = 8;
+
+const InviteList = ({ invites, schoolName, onRemove }) => {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+
+  const pending = useMemo(() => invites.filter((i) => i.status !== 'accepted'), [invites]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? pending.filter((i) => (i.email || '').toLowerCase().includes(q)) : pending;
+  }, [pending, search]);
+  useEffect(() => { setPage(0); }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / INVITES_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * INVITES_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + INVITES_PAGE_SIZE);
+
+  if (pending.length === 0) {
+    return <p className="text-sm text-gray-400">No pending invitations. Anyone who has joined appears in the accounts list below.</p>;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          {pending.length} pending {pending.length === 1 ? 'invitation' : 'invitations'}
+        </p>
+      </div>
+      {pending.length > INVITES_PAGE_SIZE && (
+        <div className="relative mb-2 max-w-xs">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by email"
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+        </div>
+      )}
+      {filtered.length === 0 ? (
+        <p className="text-sm text-gray-400 py-3">No invitations match your search.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {pageItems.map((i) => {
+            const meta = [(i.gradeLabel || i.gradeLevel) || '', i.subjects?.length ? `${i.subjects.length} subject${i.subjects.length !== 1 ? 's' : ''}` : '']
+              .filter(Boolean).join(' · ');
+            return (
+              <li key={i.id} className="flex items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-800 truncate">{i.email}</p>
+                  {meta && <p className="text-xs text-gray-400">{meta}</p>}
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-amber-100 text-amber-700">Pending</span>
+                <EmailButton invite={i} schoolName={schoolName} />
+                <CopyButton invite={i} />
+                <button onClick={() => onRemove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Revoke invitation"><FiX className="w-4 h-4" /></button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {filtered.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + INVITES_PAGE_SIZE)} of {filtered.length}</p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page"
+              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+            <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page"
+              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -553,25 +621,8 @@ const StudentInvites = ({ school, admin }) => {
 
       {loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
-      ) : list.length === 0 ? (
-        <p className="text-sm text-gray-400">No students invited yet.</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
-          {list.map((i) => (
-            <li key={i.id} className="flex items-center gap-3 py-2.5">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800 truncate">{i.email}</p>
-                <p className="text-xs text-gray-400">
-                  {i.gradeLabel || i.gradeLevel}{i.subjects?.length ? ` · ${i.subjects.length} subject${i.subjects.length !== 1 ? 's' : ''}` : ''}
-                </p>
-              </div>
-              <StatusBadge status={i.status} />
-              <EmailButton invite={i} schoolName={school.name} />
-              <CopyButton invite={i} />
-              <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
-            </li>
-          ))}
-        </ul>
+        <InviteList invites={list} schoolName={school.name} onRemove={remove} />
       )}
     </div>
   );
@@ -635,20 +686,8 @@ const RoleInvites = ({ school, admin, role, title, description, icon: Icon, plac
 
       {loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
-      ) : list.length === 0 ? (
-        <p className="text-sm text-gray-400">None invited yet.</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
-          {list.map((i) => (
-            <li key={i.id} className="flex items-center gap-3 py-2.5">
-              <p className="text-sm font-medium text-gray-800 truncate flex-1 min-w-0">{i.email}</p>
-              <StatusBadge status={i.status} />
-              <EmailButton invite={i} schoolName={school.name} />
-              <CopyButton invite={i} />
-              <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-500 p-1 flex-shrink-0" aria-label="Remove"><FiX className="w-4 h-4" /></button>
-            </li>
-          ))}
-        </ul>
+        <InviteList invites={list} schoolName={school.name} onRemove={remove} />
       )}
     </div>
   );
