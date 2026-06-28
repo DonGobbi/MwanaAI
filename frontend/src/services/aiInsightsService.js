@@ -1,7 +1,58 @@
 import { groqChat } from './groqClient';
 
+const PLATFORM_SYSTEM =
+  'You are a platform operations assistant for MwanaAI, an education platform for schools in Malawi. ' +
+  'You help the super administrator understand the health of the WHOLE platform across all schools. ' +
+  'Be concise, specific and practical. Base everything ONLY on the data provided — never invent schools, ' +
+  'numbers, names or trends. If the data does not answer something, say so plainly.';
+
 // AI-powered tools that turn data and topics into useful, ready-to-use content.
 export const aiInsights = {
+  // A short, prioritised operations briefing for the super admin, grounded in a
+  // text snapshot of the whole platform (totals, per-school counts, flags,
+  // recent activity). Returns Markdown.
+  async platformBriefing({ snapshot }) {
+    return groqChat(
+      [
+        { role: 'system', content: PLATFORM_SYSTEM },
+        {
+          role: 'user',
+          content: `Here is the current platform snapshot:
+
+${snapshot}
+
+Write a brief operations briefing in Markdown with these sections:
+**What needs attention** — the 2-4 most important issues, most urgent first (e.g. a school with students but no teacher, a suspended school, accounts about to be auto-deleted). If nothing stands out, say the platform looks healthy.
+**What's happening** — 1-2 sentences on recent activity and overall size.
+**Suggested next step** — one concrete action the administrator could take.
+Keep it under ~160 words. Base everything ONLY on the snapshot above.`,
+        },
+      ],
+      { maxTokens: 700 }
+    );
+  },
+
+  // Answer a super admin's free-text question about the platform, grounded ONLY
+  // in the snapshot. Returns Markdown.
+  async platformAsk({ question, snapshot }) {
+    return groqChat(
+      [
+        { role: 'system', content: PLATFORM_SYSTEM },
+        {
+          role: 'user',
+          content: `Platform snapshot:
+
+${snapshot}
+
+Question: ${question}
+
+Answer in short Markdown, using ONLY the snapshot. If the snapshot doesn't contain enough to answer, say so plainly and suggest where in the platform they could look.`,
+        },
+      ],
+      { maxTokens: 700 }
+    );
+  },
+
   // A full, ready-to-teach lesson plan for a topic (Markdown).
   async lessonPlan({ subject, level, topic }) {
     return groqChat(
