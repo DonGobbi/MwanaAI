@@ -11,7 +11,8 @@ import ClassGenerator from '../components/ClassGenerator';
 import ClassResources from '../components/ClassResources';
 import Spinner, { PageLoader } from '../components/Spinner';
 import { printStudentReport } from '../utils/printReport';
-import { SUBJECTS, GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
+import { GRADE_LEVELS, EXAM_TYPES, getSubject, getGradeLevel } from '../config/curriculum';
+import { useSchoolSubjects } from '../hooks/useSchoolSubjects';
 import { FiUsers, FiZap, FiBarChart2, FiClipboard, FiPrinter, FiPlus, FiFolder, FiAlertTriangle, FiTrash2 } from 'react-icons/fi';
 
 // Tabs inside a class so the teacher sees one focused section at a time.
@@ -390,6 +391,10 @@ const ClassNeedsAttention = ({ intel, members, onSelect }) => {
 
 const Teacher = () => {
   const { currentUser, userProfile } = useAuth();
+  const { subjects: subjectChoices } = useSchoolSubjects(userProfile?.schoolId);
+  // Resolve a subject's label from the school catalogue, falling back to the
+  // standard list, then the raw value.
+  const subjectLabelOf = (val) => subjectChoices.find((s) => s.value === val)?.label || getSubject(val)?.label || val;
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -430,14 +435,14 @@ const Teacher = () => {
     setCreateMsg('');
     // Block duplicate (same subject + level) up front; also enforced in the service.
     if (classes.some((c) => c.subject === newSubject && c.level === newLevel)) {
-      setCreateMsg(`You already have a ${getSubject(newSubject)?.label || newSubject} · ${getGradeLevel(newLevel)?.label || newLevel} class.`);
+      setCreateMsg(`You already have a ${subjectLabelOf(newSubject)} · ${getGradeLevel(newLevel)?.label || newLevel} class.`);
       return;
     }
     setCreating(true);
     try {
       await classService.createClass(currentUser, {
         subject: newSubject,
-        subjectLabel: getSubject(newSubject)?.label || newSubject,
+        subjectLabel: subjectLabelOf(newSubject),
         level: newLevel,
         levelLabel: getGradeLevel(newLevel)?.label || newLevel,
         schoolId: userProfile?.schoolId || '',
@@ -720,7 +725,7 @@ const Teacher = () => {
             <select value={newSubject} onChange={(e) => { setNewSubject(e.target.value); setCreateMsg(''); }}
               className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
               <option value="">Subject</option>
-              {SUBJECTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {subjectChoices.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <select value={newLevel} onChange={(e) => { setNewLevel(e.target.value); setCreateMsg(''); }}
               className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
@@ -747,7 +752,7 @@ const Teacher = () => {
             <p className="text-xs text-gray-400 mt-2">
               New class:{' '}
               <span className="font-medium text-gray-600">
-                {getSubject(newSubject)?.label} · {getGradeLevel(newLevel)?.label}
+                {subjectLabelOf(newSubject)} · {getGradeLevel(newLevel)?.label}
               </span>
             </p>
           ) : null}

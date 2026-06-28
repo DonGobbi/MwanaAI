@@ -2,6 +2,12 @@ import { db } from '../config/firebase';
 import { collection, doc, getDocs, query, where, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { SUBJECTS } from '../config/curriculum';
 
+// Stable slug used as the subject's value across the app (classes, quizzes,
+// student profiles all key off this). Standard subjects keep their curriculum
+// slug; custom ones get a slug from their name.
+export const slugifySubject = (s) =>
+  (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
 // Per-school subject catalogue. Seeded from the standard Malawi list, then
 // extended by admins. Subjects are deactivated, never deleted, so data that
 // references them (classes, quizzes) is never orphaned.
@@ -18,6 +24,7 @@ export const subjectService = {
       id,
       schoolId,
       name: (name || '').trim(),
+      value: slugifySubject(name),
       code: (code || '').trim().toUpperCase(),
       level: level || 'all',
       status: 'active',
@@ -43,7 +50,7 @@ export const subjectService = {
       if (have.has(s.label.toLowerCase())) return;
       const id = doc(collection(db, 'subjects')).id;
       batch.set(doc(db, 'subjects', id), {
-        id, schoolId, name: s.label, code: '', level: 'all',
+        id, schoolId, name: s.label, value: s.value, code: '', level: 'all',
         status: 'active', createdAt: Date.now(), createdBy: actor?.uid || '',
       });
       added += 1;

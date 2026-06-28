@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { SUBJECTS, GRADE_LEVELS } from '../config/curriculum';
+import { GRADE_LEVELS } from '../config/curriculum';
+import { useSchoolSubjects } from '../hooks/useSchoolSubjects';
 import Logo from '../components/Logo';
 import Spinner from '../components/Spinner';
 
@@ -9,6 +10,7 @@ import Spinner from '../components/Spinner';
 // asked to pick a class/subject again.
 const CourseSetup = () => {
   const { userProfile, updateCourses, logout } = useAuth();
+  const { subjects: subjectChoices } = useSchoolSubjects(userProfile?.schoolId);
   const [level, setLevel] = useState(userProfile?.gradeLevel || '');
   const [subjects, setSubjects] = useState(userProfile?.subjects || []);
   const [saving, setSaving] = useState(false);
@@ -71,7 +73,7 @@ const CourseSetup = () => {
             Your subjects <span className="font-normal text-gray-400">({subjects.length} selected)</span>
           </label>
           <div className="grid grid-cols-2 gap-2 mb-4">
-            {SUBJECTS.map((s) => {
+            {subjectChoices.map((s) => {
               const on = subjects.includes(s.value);
               return (
                 <label key={s.value}

@@ -9,6 +9,7 @@ import { auditService } from '../services/auditService';
 import { subjectService } from '../services/subjectService';
 import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
+import { useSchoolSubjects } from '../hooks/useSchoolSubjects';
 import { calculateAge } from '../utils/age';
 import Spinner, { PageLoader } from '../components/Spinner';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -589,6 +590,7 @@ const StudentInvites = ({ school, admin }) => {
   const [subjects, setSubjects] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const { subjects: subjectChoices } = useSchoolSubjects(school.id);
 
   const load = useCallback(async () => {
     try {
@@ -651,7 +653,7 @@ const StudentInvites = ({ school, admin }) => {
         <div>
           <p className="text-xs text-gray-500 mb-1">Subjects ({subjects.length})</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {SUBJECTS.map((s) => {
+            {subjectChoices.map((s) => {
               const on = subjects.includes(s.value);
               return (
                 <label key={s.value} className={`flex items-center gap-2 rounded-lg border p-2 text-sm cursor-pointer transition-colors ${
