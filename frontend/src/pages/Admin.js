@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { schoolService } from '../services/schoolService';
@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
+  FiSearch, FiChevronLeft, FiChevronRight,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -98,6 +99,8 @@ const AccountStatusBadge = ({ status }) => {
 // Actual enrolled accounts for one role: see details, reset password, and
 // (de)activate. School Admins may toggle teacher/student/parent accounts in
 // their school; only a Super Admin may toggle other admins (canDeactivate).
+const MEMBERS_PAGE_SIZE = 10;
+
 const MembersList = ({ school, role, actorUid, canDeactivate }) => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +108,9 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
   const [openId, setOpenId] = useState('');
   const [note, setNote] = useState({}); // uid -> transient message
   const [confirmAction, setConfirmAction] = useState(null); // { user, status } pending confirmation
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | active | deactivated
+  const [page, setPage] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -148,72 +154,149 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
     }
   };
 
+  const activeCount = useMemo(
+    () => members.filter((u) => (u.status || 'active').toLowerCase() === 'active').length,
+    [members],
+  );
+  const offCount = members.length - activeCount;
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return members.filter((u) => {
+      const st = (u.status || 'active').toLowerCase();
+      if (statusFilter === 'active' && st !== 'active') return false;
+      if (statusFilter === 'deactivated' && st === 'active') return false;
+      if (!q) return true;
+      return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+    });
+  }, [members, search, statusFilter]);
+
+  // Snap back to the first page whenever the result set changes.
+  useEffect(() => { setPage(0); }, [search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / MEMBERS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * MEMBERS_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + MEMBERS_PAGE_SIZE);
+
   if (loading) return <p className="text-sm text-gray-400">Loading accounts…</p>;
   if (members.length === 0) return <p className="text-sm text-gray-400">No {role} accounts yet — invites appear here once they sign up.</p>;
 
   return (
-    <>
-    <ul className="divide-y divide-gray-100">
-      {members.map((u) => {
-        const status = (u.status || 'active').toLowerCase();
-        const open = openId === u.uid;
-        const age = calculateAge(u.dateOfBirth);
-        const deactivated = status === 'deactivated' || status === 'archived';
-        return (
-          <li key={u.uid} className="py-2.5">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
-                <p className="text-xs text-gray-400 truncate">{u.email}</p>
-              </div>
-              <AccountStatusBadge status={status} />
-              <button onClick={() => setOpenId(open ? '' : u.uid)}
-                className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1 flex-shrink-0">
-                {open ? 'Hide' : 'Details'}
+    <div>
+      {/* Toolbar: search + status filter (scales to thousands of accounts) */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+        <div className="relative flex-1">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
+        >
+          <option value="all">All ({members.length})</option>
+          <option value="active">Active ({activeCount})</option>
+          <option value="deactivated">Deactivated ({offCount})</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-gray-400 py-6 text-center">No accounts match your search.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {pageItems.map((u) => {
+            const status = (u.status || 'active').toLowerCase();
+            const open = openId === u.uid;
+            const age = calculateAge(u.dateOfBirth);
+            const deactivated = status === 'deactivated' || status === 'archived';
+            const initials = (u.displayName || u.email || 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+            return (
+              <li key={u.uid} className="py-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">{initials}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                  </div>
+                  <AccountStatusBadge status={status} />
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <button onClick={() => setOpenId(open ? '' : u.uid)}
+                      className="text-xs text-gray-500 hover:text-gray-800">{open ? 'Hide' : 'Details'}</button>
+                    <button onClick={() => sendReset(u)} title="Email a password reset link"
+                      className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1">
+                      <FiKey className="w-3.5 h-3.5" /><span className="hidden sm:inline">Reset password</span>
+                    </button>
+                    {canDeactivate && (deactivated ? (
+                      <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'active' })}
+                        className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                        <FiRefreshCw className="w-3.5 h-3.5" /><span className="hidden sm:inline">Reactivate</span>
+                      </button>
+                    ) : (
+                      <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'deactivated' })}
+                        className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                        <FiSlash className="w-3.5 h-3.5" /><span className="hidden sm:inline">Deactivate</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {note[u.uid] && <p className={`text-xs mt-1 ml-12 ${note[u.uid].includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{note[u.uid]}</p>}
+                {open && (
+                  <div className="mt-2 ml-12 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3 text-xs">
+                    <div><p className="text-gray-400">Gender</p><p className="text-gray-800">{u.gender || '—'}</p></div>
+                    <div><p className="text-gray-400">Age</p><p className="text-gray-800">{age != null ? age : '—'}</p></div>
+                    <div><p className="text-gray-400">Phone</p><p className="text-gray-800">{u.phone || '—'}</p></div>
+                    <div><p className="text-gray-400">Class</p><p className="text-gray-800">{getGradeLevel(u.gradeLevel)?.label || '—'}</p></div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Footer: showing-X-of-N + pagination */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-400">
+            Showing {start + 1}–{Math.min(filtered.length, start + MEMBERS_PAGE_SIZE)} of {filtered.length}
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}
+                aria-label="Previous page"
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+                <FiChevronLeft className="w-4 h-4" />
               </button>
-              <button onClick={() => sendReset(u)}
-                className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0" title="Email a password reset link">
-                <FiKey className="w-3.5 h-3.5" /> Reset password
+              <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1}
+                aria-label="Next page"
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+                <FiChevronRight className="w-4 h-4" />
               </button>
-              {canDeactivate && (deactivated ? (
-                <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'active' })}
-                  className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
-                  <FiRefreshCw className="w-3.5 h-3.5" /> Reactivate
-                </button>
-              ) : (
-                <button disabled={busyId === u.uid}
-                  onClick={() => setConfirmAction({ user: u, status: 'deactivated' })}
-                  className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
-                  <FiSlash className="w-3.5 h-3.5" /> Deactivate
-                </button>
-              ))}
             </div>
-            {note[u.uid] && <p className={`text-xs mt-1 ${note[u.uid].includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{note[u.uid]}</p>}
-            {open && (
-              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3 text-xs">
-                <div><p className="text-gray-400">Gender</p><p className="text-gray-800">{u.gender || '—'}</p></div>
-                <div><p className="text-gray-400">Age</p><p className="text-gray-800">{age != null ? age : '—'}</p></div>
-                <div><p className="text-gray-400">Phone</p><p className="text-gray-800">{u.phone || '—'}</p></div>
-                <div><p className="text-gray-400">Class</p><p className="text-gray-800">{getGradeLevel(u.gradeLevel)?.label || '—'}</p></div>
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-    <ConfirmDialog
-      open={!!confirmAction}
-      tone={confirmAction?.status === 'active' ? 'primary' : 'danger'}
-      title={`${confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'} ${confirmAction?.user?.displayName || confirmAction?.user?.email || 'this account'}?`}
-      message={confirmAction?.status === 'active'
-        ? "They'll be able to sign in again straight away."
-        : "They won't be able to sign in until you reactivate them. Their data is kept."}
-      confirmLabel={confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'}
-      busy={!!confirmAction && busyId === confirmAction.user.uid}
-      onCancel={() => setConfirmAction(null)}
-      onConfirm={async () => { const { user, status } = confirmAction; await changeStatus(user, status); setConfirmAction(null); }}
-    />
-    </>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        tone={confirmAction?.status === 'active' ? 'primary' : 'danger'}
+        title={`${confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'} ${confirmAction?.user?.displayName || confirmAction?.user?.email || 'this account'}?`}
+        message={confirmAction?.status === 'active'
+          ? "They'll be able to sign in again straight away."
+          : "They won't be able to sign in until you reactivate them. Their data is kept."}
+        confirmLabel={confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'}
+        busy={!!confirmAction && busyId === confirmAction.user.uid}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={async () => { const { user, status } = confirmAction; await changeStatus(user, status); setConfirmAction(null); }}
+      />
+    </div>
   );
 };
 
@@ -578,6 +661,7 @@ const SchoolsList = ({ admin, onOpen }) => {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [schoolSearch, setSchoolSearch] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -637,24 +721,42 @@ const SchoolsList = ({ admin, onOpen }) => {
             <p className="font-semibold text-gray-800">No schools yet</p>
             <p className="text-sm text-gray-500">Register your first school above to get started.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {schools.map((s) => (
-              <button key={s.id} onClick={() => onOpen(s)}
-                className="text-left card p-5 hover:shadow-md hover:border-primary-200 flex items-center justify-between transition-all">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <FiHome className="text-primary-600 flex-shrink-0" />
-                    <p className="font-semibold text-gray-800 truncate">{s.name}</p>
-                    {(s.status || 'active').toLowerCase() !== 'active' && <AccountStatusBadge status={s.status} />}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</p>
+        ) : (() => {
+          const q = schoolSearch.trim().toLowerCase();
+          const visible = q ? schools.filter((s) => (s.name || '').toLowerCase().includes(q)) : schools;
+          return (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="relative flex-1 max-w-sm">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input value={schoolSearch} onChange={(e) => setSchoolSearch(e.target.value)} placeholder="Search schools"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
                 </div>
-                <FiArrowRight className="text-primary-600 flex-shrink-0 ml-3" />
-              </button>
-            ))}
-          </div>
-        )}
+                <span className="text-xs text-gray-400 flex-shrink-0">{visible.length} of {schools.length}</span>
+              </div>
+              {visible.length === 0 ? (
+                <p className="text-sm text-gray-400 py-6 text-center">No schools match your search.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {visible.map((s) => (
+                    <button key={s.id} onClick={() => onOpen(s)}
+                      className="text-left card p-5 hover:shadow-md hover:border-primary-200 flex items-center justify-between transition-all">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <FiHome className="text-primary-600 flex-shrink-0" />
+                          <p className="font-semibold text-gray-800 truncate">{s.name}</p>
+                          {(s.status || 'active').toLowerCase() !== 'active' && <AccountStatusBadge status={s.status} />}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</p>
+                      </div>
+                      <FiArrowRight className="text-primary-600 flex-shrink-0 ml-3" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
