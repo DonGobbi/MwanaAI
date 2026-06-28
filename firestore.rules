@@ -52,14 +52,40 @@ service cloud.firestore {
         || (newRole() == 'admin' && invitedAs('admin'));
     }
 
+    // A self-edit must not touch the account's lifecycle status — only an admin
+    // can activate/deactivate/archive an account (see the admin path below).
+    function statusUnchanged() {
+      return request.resource.data.get('status', resource.data.get('status', 'active'))
+        == resource.data.get('status', 'active');
+    }
+
+    // The keys an admin is permitted to change on someone else's profile: just
+    // the account-lifecycle fields, nothing personal and never the role.
+    function adminLifecycleOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'deactivatedAt', 'deactivatedBy', 'archivedAt', 'updatedAt']);
+    }
+
     // User profiles — readable by signed-in users (rosters, parent lookup).
     // A user manages their OWN profile but cannot grant themselves a privileged
-    // role (see roleAllowed). Role only needs validating when it changes.
+    // role (roleAllowed) or change their own status (statusUnchanged). A Super
+    // Admin may toggle lifecycle on anyone; a School Admin only on a
+    // teacher/student/parent in their own school.
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid == uid && roleAllowed();
-      allow update: if signedIn() && request.auth.uid == uid
-        && (request.resource.data.get('userType', '') == resource.data.get('userType', '') || roleAllowed());
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && (request.resource.data.get('userType', '') == resource.data.get('userType', '') || roleAllowed())
+          && statusUnchanged())
+        || (request.auth.uid != uid && adminLifecycleOnly() && (
+              isSuperadmin()
+              || (isSchoolAdmin()
+                  && resource.data.get('schoolId', '') != ''
+                  && resource.data.get('schoolId', '') == myUser().get('schoolId', '')
+                  && resource.data.get('userType', '') in ['teacher', 'student', 'parent'])
+           ))
+      );
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 

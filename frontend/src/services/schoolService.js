@@ -34,4 +34,10 @@ export const schoolService = {
   async updateSchool(id, name) {
     await updateDoc(doc(db, 'schools', id), { name: (name || '').trim() });
   },
+
+  // Suspend or restore a whole school (Super Admin only, enforced by rules).
+  // A suspended school blocks every member at sign-in (see AuthContext gate).
+  async setStatus(id, status) {
+    await updateDoc(doc(db, 'schools', id), { status, updatedAt: Date.now() });
+  },
 };

@@ -4,11 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { schoolService } from '../services/schoolService';
 import { inviteService } from '../services/inviteService';
 import { emailService } from '../services/emailService';
+import { accountService } from '../services/accountService';
+import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
+import { calculateAge } from '../utils/age';
 import Spinner, { PageLoader } from '../components/Spinner';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
-  FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus,
+  FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -73,6 +76,138 @@ const StatusBadge = ({ status }) => (
   }`}>
     {status === 'accepted' ? 'Joined' : 'Pending'}
   </span>
+);
+
+// Lifecycle badge for an actual account (vs. an invite).
+const ACCOUNT_STATUS_STYLES = {
+  active: 'bg-green-100 text-green-700',
+  deactivated: 'bg-red-100 text-red-700',
+  suspended: 'bg-red-100 text-red-700',
+  archived: 'bg-amber-100 text-amber-700',
+};
+const AccountStatusBadge = ({ status }) => {
+  const s = (status || 'active').toLowerCase();
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${ACCOUNT_STATUS_STYLES[s] || 'bg-gray-100 text-gray-600'}`}>
+      {s}
+    </span>
+  );
+};
+
+// Actual enrolled accounts for one role: see details, reset password, and
+// (de)activate. School Admins may toggle teacher/student/parent accounts in
+// their school; only a Super Admin may toggle other admins (canDeactivate).
+const MembersList = ({ school, role, actorUid, canDeactivate }) => {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const [openId, setOpenId] = useState('');
+  const [note, setNote] = useState({}); // uid -> transient message
+
+  const load = useCallback(async () => {
+    try {
+      const all = await accountService.listBySchool(school.id);
+      setMembers(all.filter((u) => (u.userType || '') === role));
+    } catch (err) {
+      console.error('Could not load members:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [school.id, role]);
+  useEffect(() => { load(); }, [load]);
+
+  const flash = (uid, msg) => {
+    setNote((p) => ({ ...p, [uid]: msg }));
+    setTimeout(() => setNote((p) => { const n = { ...p }; delete n[uid]; return n; }), 2500);
+  };
+
+  const changeStatus = async (u, status) => {
+    setBusyId(u.uid);
+    try {
+      await accountService.setStatus(u.uid, status, actorUid);
+      setMembers((p) => p.map((m) => (m.uid === u.uid ? { ...m, status } : m)));
+    } catch (err) {
+      console.error(err);
+      flash(u.uid, 'Could not update the account.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const sendReset = async (u) => {
+    try {
+      await firebaseService.resetPassword(u.email);
+      flash(u.uid, 'Password reset email sent ✓');
+    } catch (err) {
+      flash(u.uid, 'Could not send the reset email.');
+    }
+  };
+
+  if (loading) return <p className="text-sm text-gray-400">Loading accounts…</p>;
+  if (members.length === 0) return <p className="text-sm text-gray-400">No {role} accounts yet — invites appear here once they sign up.</p>;
+
+  return (
+    <ul className="divide-y divide-gray-100">
+      {members.map((u) => {
+        const status = (u.status || 'active').toLowerCase();
+        const open = openId === u.uid;
+        const age = calculateAge(u.dateOfBirth);
+        const deactivated = status === 'deactivated' || status === 'archived';
+        return (
+          <li key={u.uid} className="py-2.5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
+                <p className="text-xs text-gray-400 truncate">{u.email}</p>
+              </div>
+              <AccountStatusBadge status={status} />
+              <button onClick={() => setOpenId(open ? '' : u.uid)}
+                className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1 flex-shrink-0">
+                {open ? 'Hide' : 'Details'}
+              </button>
+              <button onClick={() => sendReset(u)}
+                className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0" title="Email a password reset link">
+                <FiKey className="w-3.5 h-3.5" /> Reset password
+              </button>
+              {canDeactivate && (deactivated ? (
+                <button disabled={busyId === u.uid} onClick={() => changeStatus(u, 'active')}
+                  className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
+                  <FiRefreshCw className="w-3.5 h-3.5" /> Reactivate
+                </button>
+              ) : (
+                <button disabled={busyId === u.uid}
+                  onClick={() => { if (window.confirm(`Deactivate ${u.displayName || u.email}? They won't be able to sign in until reactivated.`)) changeStatus(u, 'deactivated'); }}
+                  className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
+                  <FiSlash className="w-3.5 h-3.5" /> Deactivate
+                </button>
+              ))}
+            </div>
+            {note[u.uid] && <p className="text-xs text-green-600 mt-1">{note[u.uid]}</p>}
+            {open && (
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3 text-xs">
+                <div><p className="text-gray-400">Gender</p><p className="text-gray-800">{u.gender || '—'}</p></div>
+                <div><p className="text-gray-400">Age</p><p className="text-gray-800">{age != null ? age : '—'}</p></div>
+                <div><p className="text-gray-400">Phone</p><p className="text-gray-800">{u.phone || '—'}</p></div>
+                <div><p className="text-gray-400">Class</p><p className="text-gray-800">{getGradeLevel(u.gradeLevel)?.label || '—'}</p></div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+// A role tab = invite people in + manage the accounts that have joined.
+const PeopleSection = ({ inviteUI, school, role, actorUid, canDeactivate, accountsTitle, icon: Icon }) => (
+  <div className="space-y-5">
+    {inviteUI}
+    <div className="card p-5">
+      <div className="flex items-center gap-2 mb-1"><Icon className="text-primary-600" /><h2 className="font-bold text-gray-900">{accountsTitle}</h2></div>
+      <p className="text-sm text-gray-500 mb-3">Accounts that have joined. View details, send a password reset, or deactivate access.</p>
+      <MembersList school={school} role={role} actorUid={actorUid} canDeactivate={canDeactivate} />
+    </div>
+  </div>
 );
 
 const StatTile = ({ icon: Icon, value, label, sub, color }) => (
@@ -492,6 +627,7 @@ const SchoolsList = ({ admin, onOpen }) => {
                   <div className="flex items-center gap-2">
                     <FiHome className="text-primary-600 flex-shrink-0" />
                     <p className="font-semibold text-gray-800 truncate">{s.name}</p>
+                    {(s.status || 'active').toLowerCase() !== 'active' && <AccountStatusBadge status={s.status} />}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</p>
                 </div>
@@ -511,6 +647,20 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
   const [name, setName] = useState(school.name);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [schoolStatus, setSchoolStatus] = useState((school.status || 'active').toLowerCase());
+  const [statusBusy, setStatusBusy] = useState(false);
+
+  const changeSchoolStatus = async (status) => {
+    setStatusBusy(true); setMsg('');
+    try {
+      await schoolService.setStatus(school.id, status);
+      setSchoolStatus(status);
+    } catch (err) {
+      setMsg(err.message || 'Could not update school access.');
+    } finally {
+      setStatusBusy(false);
+    }
+  };
 
   const saveName = async () => {
     if (!name.trim()) return;
@@ -541,7 +691,10 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         {isSuper && (
           <button onClick={onBack} className="text-sm text-primary-600 hover:underline mb-4">← Back to schools</button>
         )}
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">{school.name}</h1>
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl font-bold text-gray-900">{school.name}</h1>
+          {schoolStatus !== 'active' && <AccountStatusBadge status={schoolStatus} />}
+        </div>
         <p className="text-gray-600 text-sm mb-6">
           {isSuper
             ? 'Manage this school — admins, teachers, students and parents.'
@@ -563,23 +716,39 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         {tab === 'overview' && <Overview school={school} isSuper={isSuper} onGo={setTab} />}
 
         {tab === 'admins' && (
-          <RoleInvites school={school} admin={admin} role="admin" icon={FiShield}
-            title="School Admins" placeholder="admin@example.com"
-            description="Invite a school admin to help run this school. They can add admins, teachers, students and parents — but can't register schools or super admins." />
+          <PeopleSection school={school} role="admin" actorUid={admin.uid} canDeactivate={isSuper}
+            accountsTitle="School admin accounts" icon={FiShield}
+            inviteUI={
+              <RoleInvites school={school} admin={admin} role="admin" icon={FiShield}
+                title="School Admins" placeholder="admin@example.com"
+                description="Invite a school admin to help run this school. They can add admins, teachers, students and parents — but can't register schools or super admins." />
+            } />
         )}
 
         {tab === 'teachers' && (
-          <RoleInvites school={school} admin={admin} role="teacher" icon={FiUserCheck}
-            title="Teachers" placeholder="teacher@example.com"
-            description="Invite a teacher. When they sign up with this email they join as a teacher and can create their classes." />
+          <PeopleSection school={school} role="teacher" actorUid={admin.uid} canDeactivate
+            accountsTitle="Teacher accounts" icon={FiUserCheck}
+            inviteUI={
+              <RoleInvites school={school} admin={admin} role="teacher" icon={FiUserCheck}
+                title="Teachers" placeholder="teacher@example.com"
+                description="Invite a teacher. When they sign up with this email they join as a teacher and can create their classes." />
+            } />
         )}
 
-        {tab === 'students' && <StudentInvites school={school} admin={admin} />}
+        {tab === 'students' && (
+          <PeopleSection school={school} role="student" actorUid={admin.uid} canDeactivate
+            accountsTitle="Student accounts" icon={FiUsers}
+            inviteUI={<StudentInvites school={school} admin={admin} />} />
+        )}
 
         {tab === 'parents' && (
-          <RoleInvites school={school} admin={admin} role="parent" icon={FiUsers}
-            title="Parents" placeholder="parent@example.com"
-            description="Invite a parent. When they sign up with this email they can follow their child's progress." />
+          <PeopleSection school={school} role="parent" actorUid={admin.uid} canDeactivate
+            accountsTitle="Parent accounts" icon={FiUsers}
+            inviteUI={
+              <RoleInvites school={school} admin={admin} role="parent" icon={FiUsers}
+                title="Parents" placeholder="parent@example.com"
+                description="Invite a parent. When they sign up with this email they can follow their child's progress." />
+            } />
         )}
 
         {tab === 'settings' && isSuper && (
@@ -603,6 +772,32 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
               <p className="text-sm text-gray-500 mb-3">{GRADE_LEVELS.length} classes and {SUBJECTS.length} subjects available (Malawi curriculum).</p>
               <div className="flex flex-wrap gap-2">
                 {SUBJECTS.map((s) => <span key={s.value} className="text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full">{s.label}</span>)}
+              </div>
+            </div>
+
+            {/* School access — suspending blocks every member at sign-in. */}
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1"><FiShield className="text-primary-600" /><h2 className="font-bold text-gray-900">School access</h2></div>
+              <p className="text-sm text-gray-500 mb-3">
+                {schoolStatus === 'suspended'
+                  ? 'This school is suspended — none of its admins, teachers, students or parents can sign in.'
+                  : 'Suspend the whole school to immediately block everyone from signing in. You can restore access any time.'}
+              </p>
+              <div className="flex items-center gap-3">
+                <AccountStatusBadge status={schoolStatus} />
+                {schoolStatus === 'suspended' ? (
+                  <button onClick={() => changeSchoolStatus('active')} disabled={statusBusy}
+                    className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    {statusBusy ? <Spinner className="w-4 h-4" /> : <><FiRefreshCw /> Restore access</>}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { if (window.confirm(`Suspend ${school.name}? Everyone at this school will be unable to sign in until you restore access.`)) changeSchoolStatus('suspended'); }}
+                    disabled={statusBusy}
+                    className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    {statusBusy ? <Spinner className="w-4 h-4" /> : <><FiSlash /> Suspend school</>}
+                  </button>
+                )}
               </div>
             </div>
           </div>
