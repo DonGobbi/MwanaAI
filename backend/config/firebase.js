@@ -3,111 +3,82 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// For development purposes, create a mock implementation
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 let firebaseApp, db, auth, storage;
+let realAdmin = false;
 
-if (isDevelopment) {
-  console.log('Running in development mode with mock Firebase implementation');
-
-  // Mock implementations for development
-  const mockDoc = {
-    get: async () => ({
-      exists: false,
-      data: () => ({}),
-      id: 'mock-id',
-    }),
-    set: async (data) => Promise.resolve(),
-    update: async (data) => Promise.resolve(),
-    delete: async () => Promise.resolve(),
-  };
-
-  const mockFirestore = {
-    collection: (name) => ({
-      doc: (id) => mockDoc,
-      where: () => ({
-        get: async () => ({
-          empty: true,
-          docs: [],
-          forEach: (callback) => {},
-        }),
-        limit: () => ({
-          get: async () => ({
-            empty: true,
-            docs: [],
-            forEach: (callback) => {},
-          }),
-        }),
-      }),
-      add: async (data) => Promise.resolve({ id: 'mock-id-' + Date.now() }),
-      get: async () => ({
-        empty: true,
-        docs: [],
-        forEach: (callback) => {},
-      }),
-    }),
-    batch: () => ({
-      set: (ref, data) => Promise.resolve(),
-      update: (ref, data) => Promise.resolve(),
-      delete: (ref) => Promise.resolve(),
-      commit: async () => Promise.resolve(),
-    }),
-  };
-
-  db = mockFirestore;
-  auth = {
-    verifyIdToken: async () => ({ uid: 'mock-user' }),
-    getUser: async () => ({ uid: 'mock-user', email: 'mock@example.com' }),
-  };
-  storage = {
-    bucket: () => ({
-      file: () => ({
-        getSignedUrl: async () => ['https://mock-storage-url.com'],
-        save: async () => Promise.resolve(),
-        delete: async () => Promise.resolve(),
-      }),
-      upload: async () => Promise.resolve(),
-    }),
-  };
-
-  firebaseApp = { name: 'mock-app' };
-} else {
-  // Try to load service account from file
-  let serviceAccount;
+// A service account turns on the REAL Admin SDK (full privileges, bypasses
+// security rules) — needed for true account deletion and the auto-purge sweep.
+// Preferred: a JSON key file at backend/firebase-service-account-key.json
+// (gitignored). Fallback: FIREBASE_PROJECT_ID / _CLIENT_EMAIL / _PRIVATE_KEY.
+function loadServiceAccount() {
   try {
-    serviceAccount = require('../firebase-service-account-key.json');
-  } catch (error) {
-    console.warn(
-      'Firebase service account key file not found. Using environment variables instead.'
-    );
-    // If service account file is not available, use environment variables
-    serviceAccount = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY
-        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\n/g, '\n')
-        : '',
-    };
+    return require('../firebase-service-account-key.json');
+  } catch (_) {
+    if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+      return {
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      };
+    }
+    return null;
   }
+}
 
-  // Initialize Firebase Admin
+const serviceAccount = loadServiceAccount();
+
+if (serviceAccount && (serviceAccount.private_key || serviceAccount.privateKey)) {
   firebaseApp = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
-
-  // Initialize services
   db = admin.firestore();
   auth = admin.auth();
   storage = admin.storage();
+  realAdmin = true;
+  console.log('Firebase Admin SDK initialized with real credentials.');
+} else {
+  console.warn(
+    'No Firebase service account found — using a mock. Admin-only features ' +
+      '(true account deletion, 45-day auto-purge) stay disabled until you add ' +
+      'backend/firebase-service-account-key.json.'
+  );
+
+  const mockDoc = {
+    get: async () => ({ exists: false, data: () => ({}), id: 'mock-id' }),
+    set: async () => Promise.resolve(),
+    update: async () => Promise.resolve(),
+    delete: async () => Promise.resolve(),
+  };
+  const mockFirestore = {
+    collection: () => ({
+      doc: () => mockDoc,
+      where: () => ({
+        get: async () => ({ empty: true, docs: [], forEach: () => {} }),
+        limit: () => ({ get: async () => ({ empty: true, docs: [], forEach: () => {} }) }),
+      }),
+      add: async () => Promise.resolve({ id: 'mock-id-' + Date.now() }),
+      get: async () => ({ empty: true, docs: [], forEach: () => {} }),
+    }),
+    batch: () => ({ set: () => {}, update: () => {}, delete: () => {}, commit: async () => Promise.resolve() }),
+  };
+  db = mockFirestore;
+  auth = {
+    verifyIdToken: async () => ({ uid: 'mock-user' }),
+    getUser: async () => ({ uid: 'mock-user', email: 'mock@example.com' }),
+    getUserByEmail: async () => ({ uid: 'mock-user', email: 'mock@example.com' }),
+    createUser: async () => ({ uid: 'mock-user', email: 'mock@example.com' }),
+    createCustomToken: async () => 'mock-token',
+    deleteUser: async () => Promise.resolve(),
+  };
+  storage = {
+    bucket: () => ({
+      file: () => ({ getSignedUrl: async () => ['https://mock-storage-url.com'], save: async () => {}, delete: async () => {} }),
+      upload: async () => Promise.resolve(),
+    }),
+  };
+  firebaseApp = { name: 'mock-app' };
+  realAdmin = false;
 }
 
-// Export Firebase services
-module.exports = {
-  admin,
-  db,
-  auth,
-  storage,
-  firebaseApp,
-};
+module.exports = { admin, db, auth, storage, firebaseApp, realAdmin };

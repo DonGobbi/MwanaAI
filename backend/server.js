@@ -23,6 +23,7 @@ app.get('/', (req, res) => {
 });
 
 // API Routes
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/email', require('./routes/email'));
 app.use('/api/resources', require('./routes/resources'));
@@ -46,4 +47,6 @@ app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   // Keep yt-dlp fresh (best-effort) so YouTube transcripts keep working.
   require('./utils/ytdlp').scheduleYtDlpUpdates();
+  // Permanently remove accounts archived over 45 days (only if Admin SDK is configured).
+  require('./utils/purgeSweep').scheduleArchivePurge();
 });

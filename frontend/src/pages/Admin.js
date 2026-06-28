@@ -192,6 +192,7 @@ const daysLeftInArchive = (archivedAt) => {
 const MEMBERS_PAGE_SIZE = 10;
 
 const MembersList = ({ school, role, actor, canDeactivate }) => {
+  const { getIdToken } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
@@ -256,12 +257,32 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
   const purgeUser = async (u) => {
     setBusyId(u.uid);
     try {
-      await accountService.purge(u.uid, actor?.uid);
-      setMembers((p) => p.filter((m) => m.uid !== u.uid)); // becomes a hidden tombstone
-      auditService.log({
-        schoolId: school.id, actor, action: 'Permanently deleted account',
-        targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
-      });
+      // Prefer a TRUE delete via the backend (removes the login + record). If
+      // the server isn't configured (503) or unreachable, fall back to a
+      // client-side tombstone so the account is still blocked from signing in.
+      let result = { ok: false, status: 0 };
+      try {
+        const idToken = await getIdToken();
+        result = await accountService.hardDelete(u.uid, idToken);
+      } catch (_) {
+        result = { ok: false, status: 0 };
+      }
+
+      if (result.ok) {
+        setMembers((p) => p.filter((m) => m.uid !== u.uid)); // backend deleted + audited
+        return;
+      }
+      if (result.status === 503 || result.status === 0) {
+        await accountService.purge(u.uid, actor?.uid); // tombstone fallback
+        setMembers((p) => p.filter((m) => m.uid !== u.uid));
+        auditService.log({
+          schoolId: school.id, actor, action: 'Permanently deleted account',
+          targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
+        });
+        return;
+      }
+      // Authorization or other server error — surface it.
+      flash(u.uid, result.error || 'Could not delete the account.');
     } catch (err) {
       console.error('purge failed:', err);
       flash(u.uid, err?.code === 'permission-denied'

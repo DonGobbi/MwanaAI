@@ -1,5 +1,6 @@
 import { db } from '../config/firebase';
 import { collection, doc, getDocs, query, where, updateDoc } from 'firebase/firestore';
+import { API_BASE } from '../config/api';
 
 // Account lifecycle management for admins. Reading any user is allowed for
 // signed-in users (rosters); writing another user's status is gated in the
@@ -24,6 +25,24 @@ export const accountService = {
       .map((d) => d.data())
       .filter((u) => !['archived', 'deleted'].includes((u.status || 'active').toLowerCase()) && u.userType !== 'superadmin')
       .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+  },
+
+  // True permanent delete via the backend (Admin SDK): removes the Firebase
+  // Auth login AND the Firestore record. Returns { ok } on success, or
+  // { ok: false, status } so the caller can fall back to a tombstone when the
+  // backend isn't configured (503) or is unreachable (status 0).
+  async hardDelete(uid, idToken) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${uid}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (res.ok) return { ok: true };
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, status: res.status, error: data.error };
+    } catch (_) {
+      return { ok: false, status: 0, error: 'unreachable' };
+    }
   },
 
   // Permanent delete as a tombstone: an archived account is anonymized and
