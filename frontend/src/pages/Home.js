@@ -5,6 +5,8 @@ import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
 import { assignmentService } from '../services/assignmentService';
 import { goalService } from '../services/goalService';
+import { schoolService } from '../services/schoolService';
+import { accountService } from '../services/accountService';
 import { useCourses } from '../hooks/useCourses';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
@@ -586,19 +588,102 @@ const ParentHome = ({ firstName }) => {
   );
 };
 
-// Super Admin / School Admin dashboard.
+// Super Admin / School Admin dashboard — a real overview, not just two cards.
 const AdminHome = ({ firstName, role }) => {
+  const { userProfile } = useAuth();
   const isSuper = role === 'superadmin';
+  const [schools, setSchools] = useState([]);
+  const [counts, setCounts] = useState({ student: 0, teacher: 0, admin: 0, parent: 0, total: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        if (isSuper) {
+          const [sc, st] = await Promise.all([schoolService.listSchools(), accountService.platformStats()]);
+          if (active) { setSchools(sc); setCounts(st); }
+        } else if (userProfile?.schoolId) {
+          const accts = await accountService.listBySchool(userProfile.schoolId);
+          const c = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 };
+          accts.forEach((u) => {
+            if ((u.status || 'active').toLowerCase() === 'archived') return;
+            if (c[u.userType] != null) { c[u.userType] += 1; c.total += 1; }
+          });
+          if (active) setCounts(c);
+        }
+      } catch (e) {
+        /* ignore */
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [isSuper, userProfile?.schoolId]);
+
+  const activeSchools = schools.filter((s) => (s.status || 'active').toLowerCase() === 'active').length;
+  const suspended = schools.length - activeSchools;
+  const v = (n) => (loading ? '…' : n);
+
   return (
     <>
       <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-sm">
         <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
         <p className="text-primary-50 mt-1">
-          {isSuper ? 'Register schools and manage their admins, teachers, students and parents.' : "Manage your school's admins, teachers, students and parents."}
+          {isSuper ? 'Your platform at a glance — schools and everyone in them.' : 'Your school at a glance.'}
         </p>
       </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {isSuper && (
+          <StatTile icon={FiHome} value={v(schools.length)}
+            label={schools.length ? (suspended ? `Schools · ${suspended} suspended` : 'Schools · all active') : 'Schools'}
+            color="bg-sky-100 text-sky-600" />
+        )}
+        <StatTile icon={FiUsers} value={v(counts.student)} label="Students" color="bg-emerald-100 text-emerald-600" />
+        <StatTile icon={FiUserCheck} value={v(counts.teacher)} label="Teachers" color="bg-violet-100 text-violet-600" />
+        <StatTile icon={FiUsers} value={v(counts.parent)} label="Parents" color="bg-amber-100 text-amber-600" />
+        {!isSuper && <StatTile icon={FiHome} value={v(counts.admin)} label="School admins" color="bg-rose-100 text-rose-600" />}
+      </div>
+
+      {/* Super Admin: the schools, right here */}
+      {isSuper && (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-gray-900">Schools</h2>
+            <Link to="/admin" className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1">
+              Manage all <FiArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          {loading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : schools.length === 0 ? (
+            <p className="text-sm text-gray-500">No schools yet. <Link to="/admin" className="text-primary-600 hover:underline">Register your first school</Link>.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {schools.slice(0, 5).map((s) => (
+                <li key={s.id}>
+                  <Link to={`/admin/schools/${s.id}/overview`} className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded-lg hover:bg-gray-50">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <FiHome className="text-primary-600 flex-shrink-0" />
+                      <span className="font-medium text-gray-800 truncate">{s.name}</span>
+                      {(s.status || 'active').toLowerCase() !== 'active' && (
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex-shrink-0">suspended</span>
+                      )}
+                    </span>
+                    <FiArrowRight className="text-gray-300 flex-shrink-0" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Quick actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DashboardCard to="/admin" icon={FiHome} title={isSuper ? 'Schools' : 'My School'}
+        <DashboardCard to="/admin" icon={FiHome} title={isSuper ? 'Manage schools' : 'My School'}
           text={isSuper
             ? 'Register a school, then open it to add admins, teachers, students and parents.'
             : 'Add admins, teachers, students and parents to your school.'}
