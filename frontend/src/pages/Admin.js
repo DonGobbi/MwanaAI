@@ -15,6 +15,7 @@ import { calculateAge } from '../utils/age';
 import Spinner, { PageLoader } from '../components/Spinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ActionMenu from '../components/ActionMenu';
+import PlatformInsights from '../components/PlatformInsights';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
@@ -1792,6 +1793,19 @@ const NoSchoolAssigned = () => (
   </div>
 );
 
+// ---- AI Assistant (Super Admin) ----
+const AssistantPage = () => (
+  <div className="bg-gray-50 min-h-screen">
+    <div className="container py-8 max-w-3xl">
+      <h1 className="text-2xl font-bold text-gray-900 mb-1">Assistant</h1>
+      <p className="text-gray-600 text-sm mb-6">
+        Ask anything about your platform, or get a briefing. Answers come straight from your live data.
+      </p>
+      <PlatformInsights />
+    </div>
+  </div>
+);
+
 // ---- Platform-wide activity feed (Super Admin) ----
 const PLATFORM_PAGE_SIZE = 15;
 
@@ -2033,6 +2047,7 @@ const Admin = () => {
       />
       <Route path="users" element={isSuper ? <PlatformUsers /> : <Navigate to="/admin" replace />} />
       <Route path="activity" element={isSuper ? <PlatformActivity /> : <Navigate to="/admin" replace />} />
+      <Route path="insights" element={isSuper ? <AssistantPage /> : <Navigate to="/admin" replace />} />
       <Route path="schools/:schoolId" element={<SchoolOverviewRedirect />} />
       <Route path="schools/:schoolId/:tab" element={<ManageSchoolRoute admin={currentUser} isSuper={isSuper} userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />

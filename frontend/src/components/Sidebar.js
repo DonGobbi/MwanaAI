@@ -14,6 +14,7 @@ import {
   FiLayers,
   FiHome,
   FiActivity,
+  FiZap,
 } from 'react-icons/fi';
 
 const NAV = {
@@ -69,7 +70,7 @@ const NAV = {
     {
       label: 'Tools',
       items: [
-        { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },
+        { to: '/admin/insights', icon: FiZap, text: 'Assistant' },
       ],
     },
   ],

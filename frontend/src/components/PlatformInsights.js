@@ -28,8 +28,9 @@ const ago = (ts) => {
 
 // Turn the live platform data into a compact, factual snapshot the AI reasons
 // over. Flags are computed here (deterministic) so the AI never has to guess.
-function buildSnapshot({ stats, schools, activity, schoolName }) {
-  const totals = `${stats.student} students, ${stats.teacher} teachers, ${stats.admin} admins, ${stats.parent} parents across ${schools.length} school(s). ${stats.deactivated} account(s) deactivated.`;
+function buildSnapshot({ stats, schools, activity, schoolName, generatedAt }) {
+  const suspended = schools.filter((s) => (s.status || 'active').toLowerCase() !== 'active').length;
+  const totals = `${stats.student} students, ${stats.teacher} teachers, ${stats.admin} school admins, ${stats.parent} parents across ${schools.length} school(s) (${suspended} not active). ${stats.deactivated} account(s) deactivated. ${stats.total} active accounts in total.`;
 
   const schoolLines = schools
     .map((s) => {
@@ -48,7 +49,7 @@ function buildSnapshot({ stats, schools, activity, schoolName }) {
   });
 
   const activityLines = activity
-    .slice(0, 12)
+    .slice(0, 20)
     .map((l) => {
       const where = schoolName[l.schoolId] ? ` at ${schoolName[l.schoolId]}` : '';
       const who = l.targetName ? ` "${l.targetName}"` : '';
@@ -56,7 +57,7 @@ function buildSnapshot({ stats, schools, activity, schoolName }) {
     })
     .join('\n');
 
-  return `PLATFORM SNAPSHOT
+  return `PLATFORM SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
 Totals: ${totals}
 
 Schools:
@@ -86,11 +87,12 @@ const PlatformInsights = () => {
       const [stats, schools, activity] = await Promise.all([
         accountService.platformStats(),
         schoolService.listSchools(),
-        auditService.listRecent(15),
+        auditService.listRecent(25),
       ]);
       const schoolName = {};
       schools.forEach((s) => { schoolName[s.id] = s.name; });
-      const snap = buildSnapshot({ stats, schools, activity, schoolName });
+      const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+      const snap = buildSnapshot({ stats, schools, activity, schoolName, generatedAt });
       setSnapshot(snap);
       const text = await aiInsights.platformBriefing({ snapshot: snap });
       setBriefing(text);

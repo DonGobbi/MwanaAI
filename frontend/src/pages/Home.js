@@ -9,7 +9,6 @@ import { schoolService } from '../services/schoolService';
 import { accountService } from '../services/accountService';
 import { auditService } from '../services/auditService';
 import { useCourses } from '../hooks/useCourses';
-import PlatformInsights from '../components/PlatformInsights';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
 import { analyzeResults } from '../services/studentIntel';
@@ -692,13 +691,6 @@ const AdminHome = ({ firstName, role }) => {
               </Link>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* AI Platform Insights — super admin's operator co-pilot */}
-      {isSuper && (
-        <div className="mb-5">
-          <PlatformInsights />
         </div>
       )}
 
