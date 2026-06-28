@@ -159,6 +159,17 @@ service cloud.firestore {
         || (signedIn() && resource.data.email == request.auth.token.email);
     }
 
+    // Audit trail (admin action history) — append-only. A Super Admin reads
+    // all; a School Admin reads their own school. Entries are immutable (no
+    // update/delete) so the history is retained even after accounts are purged.
+    // create requires the writer to stamp themselves as the actor.
+    match /audit_logs/{id} {
+      allow read: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.schoolId == myUser().get('schoolId', ''));
+      allow create: if (isSuperadmin() || isSchoolAdmin())
+        && request.resource.data.actorId == request.auth.uid;
+    }
+
     // Learning goals — private to the student who created them (query by userId).
     match /goals/{id} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;

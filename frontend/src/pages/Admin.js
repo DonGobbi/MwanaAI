@@ -5,6 +5,7 @@ import { schoolService } from '../services/schoolService';
 import { inviteService } from '../services/inviteService';
 import { emailService } from '../services/emailService';
 import { accountService } from '../services/accountService';
+import { auditService } from '../services/auditService';
 import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import { calculateAge } from '../utils/age';
@@ -14,7 +15,7 @@ import ActionMenu from '../components/ActionMenu';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
-  FiSearch, FiChevronLeft, FiChevronRight, FiEye,
+  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -170,7 +171,7 @@ const InviteList = ({ invites, schoolName, onRemove }) => {
 // their school; only a Super Admin may toggle other admins (canDeactivate).
 const MEMBERS_PAGE_SIZE = 10;
 
-const MembersList = ({ school, role, actorUid, canDeactivate }) => {
+const MembersList = ({ school, role, actor, canDeactivate }) => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
@@ -198,11 +199,17 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
     setTimeout(() => setNote((p) => { const n = { ...p }; delete n[uid]; return n; }), 2500);
   };
 
+  const ACTION_LABELS = { active: 'Reactivated account', deactivated: 'Deactivated account', archived: 'Archived account' };
+
   const changeStatus = async (u, status) => {
     setBusyId(u.uid);
     try {
-      await accountService.setStatus(u.uid, status, actorUid);
+      await accountService.setStatus(u.uid, status, actor?.uid);
       setMembers((p) => p.map((m) => (m.uid === u.uid ? { ...m, status } : m)));
+      auditService.log({
+        schoolId: school.id, actor, action: ACTION_LABELS[status] || `Set status: ${status}`,
+        targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
+      });
     } catch (err) {
       console.error('setStatus failed:', err);
       const msg = err?.code === 'permission-denied'
@@ -218,6 +225,10 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
     try {
       await firebaseService.resetPassword(u.email);
       flash(u.uid, 'Password reset email sent ✓');
+      auditService.log({
+        schoolId: school.id, actor, action: 'Sent password reset',
+        targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
+      });
     } catch (err) {
       flash(u.uid, 'Could not send the reset email.');
     }
@@ -360,13 +371,13 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
 };
 
 // A role tab = invite people in + manage the accounts that have joined.
-const PeopleSection = ({ inviteUI, school, role, actorUid, canDeactivate, accountsTitle, icon: Icon }) => (
+const PeopleSection = ({ inviteUI, school, role, actor, canDeactivate, accountsTitle, icon: Icon }) => (
   <div className="space-y-5">
     {inviteUI}
     <div className="card p-5">
       <div className="flex items-center gap-2 mb-1"><Icon className="text-primary-600" /><h2 className="font-bold text-gray-900">{accountsTitle}</h2></div>
       <p className="text-sm text-gray-500 mb-3">Accounts that have joined. View details, send a password reset, or deactivate access.</p>
-      <MembersList school={school} role={role} actorUid={actorUid} canDeactivate={canDeactivate} />
+      <MembersList school={school} role={role} actor={actor} canDeactivate={canDeactivate} />
     </div>
   </div>
 );
@@ -553,6 +564,7 @@ const StudentInvites = ({ school, admin }) => {
       const gradeLabel = getGradeLevel(gradeLevel)?.label || gradeLevel;
       await inviteService.create(admin, school, { email, role: 'student', gradeLevel, gradeLabel, subjects });
       const sent = await emailService.sendInvite({ email, role: 'student', schoolName: school.name, gradeLevel, gradeLabel, subjects });
+      auditService.log({ schoolId: school.id, actor: admin, action: 'Invited a student', targetType: 'student', targetId: email, targetName: email });
       setEmail(''); setGradeLevel(''); setSubjects([]); setMsg(sendNote(sent));
       load();
     } catch (err) {
@@ -647,6 +659,7 @@ const RoleInvites = ({ school, admin, role, title, description, icon: Icon, plac
     try {
       await inviteService.create(admin, school, { email, role });
       const sent = await emailService.sendInvite({ email, role, schoolName: school.name });
+      auditService.log({ schoolId: school.id, actor: admin, action: `Invited a ${role}`, targetType: role, targetId: email, targetName: email });
       setEmail(''); setMsg(sendNote(sent));
       load();
     } catch (err) {
@@ -712,8 +725,12 @@ const SchoolsList = ({ admin, onOpen }) => {
     if (!name.trim()) return;
     setSaving(true); setMsg('');
     try {
-      await schoolService.createSchool(admin.uid, name);
+      const created = await schoolService.createSchool(admin.uid, name);
       setName(''); setMsg('School registered ✓');
+      auditService.log({
+        schoolId: created.id, actor: admin, action: 'Registered school',
+        targetType: 'school', targetId: created.id, targetName: created.name,
+      });
       load();
     } catch (err) {
       setMsg(err.message || 'Could not register the school.');
@@ -727,6 +744,11 @@ const SchoolsList = ({ admin, onOpen }) => {
     try {
       await schoolService.setStatus(s.id, status);
       setSchools((prev) => prev.map((x) => (x.id === s.id ? { ...x, status } : x)));
+      auditService.log({
+        schoolId: s.id, actor: admin,
+        action: status === 'active' ? 'Restored school access' : 'Suspended school',
+        targetType: 'school', targetId: s.id, targetName: s.name,
+      });
     } catch (err) {
       console.error('school setStatus failed:', err);
     } finally {
@@ -854,6 +876,112 @@ const SchoolsList = ({ admin, onOpen }) => {
   );
 };
 
+// ---- Activity history (audit trail) for one school ----
+const AUDIT_PAGE_SIZE = 15;
+
+const formatDateTime = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+};
+
+const actionIcon = (action) => {
+  const a = (action || '').toLowerCase();
+  if (a.includes('deactivat') || a.includes('suspend') || a.includes('archiv')) return <FiSlash className="w-4 h-4 text-red-500" />;
+  if (a.includes('reactivat') || a.includes('restor')) return <FiRefreshCw className="w-4 h-4 text-green-600" />;
+  if (a.includes('password')) return <FiKey className="w-4 h-4 text-primary-600" />;
+  if (a.includes('invited')) return <FiMail className="w-4 h-4 text-primary-600" />;
+  if (a.includes('register')) return <FiPlus className="w-4 h-4 text-primary-600" />;
+  return <FiClock className="w-4 h-4 text-gray-400" />;
+};
+
+const AuditLog = ({ school }) => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const all = await auditService.listForSchool(school.id);
+        if (active) setLogs(all);
+      } catch (err) {
+        console.error('Could not load history:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [school.id]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? logs.filter((l) => `${l.actorName} ${l.action} ${l.targetName}`.toLowerCase().includes(q)) : logs;
+  }, [logs, search]);
+  useEffect(() => { setPage(0); }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / AUDIT_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * AUDIT_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + AUDIT_PAGE_SIZE);
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center gap-2 mb-1"><FiClock className="text-primary-600" /><h2 className="font-bold text-gray-900">Activity history</h2></div>
+      <p className="text-sm text-gray-500 mb-3">A record of admin actions in this school — who did what, and when.</p>
+
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : logs.length === 0 ? (
+        <p className="text-sm text-gray-400">No activity recorded yet. Admin actions (invites, deactivations, password resets and more) will appear here.</p>
+      ) : (
+        <>
+          {logs.length > AUDIT_PAGE_SIZE && (
+            <div className="relative mb-3 max-w-sm">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activity"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+            </div>
+          )}
+          {filtered.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4">No activity matches your search.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {pageItems.map((l) => (
+                <li key={l.id} className="flex items-start gap-3 py-2.5">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">{actionIcon(l.action)}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-800">
+                      <span className="font-medium">{l.actorName}</span> · {l.action}
+                      {l.targetName ? <> — <span className="text-gray-600">{l.targetName}</span></> : null}
+                    </p>
+                    <p className="text-xs text-gray-400">{formatDateTime(l.createdAt)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {filtered.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + AUDIT_PAGE_SIZE)} of {filtered.length}</p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page"
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page"
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 // ---- Manage one school: admins, teachers, students, parents ----
 const ManageSchool = ({ school, admin, isSuper, onBack }) => {
   const [tab, setTab] = useState('overview');
@@ -896,6 +1024,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
     { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
     { id: 'students', label: 'Students', icon: FiUsers },
     { id: 'parents', label: 'Parents', icon: FiUsers },
+    { id: 'history', label: 'History', icon: FiClock },
     ...(isSuper ? [{ id: 'settings', label: 'Settings', icon: FiSettings }] : []),
   ];
 
@@ -930,7 +1059,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         {tab === 'overview' && <Overview school={school} isSuper={isSuper} onGo={setTab} />}
 
         {tab === 'admins' && (
-          <PeopleSection school={school} role="admin" actorUid={admin.uid} canDeactivate={isSuper}
+          <PeopleSection school={school} role="admin" actor={admin} canDeactivate={isSuper}
             accountsTitle="School admin accounts" icon={FiShield}
             inviteUI={
               <RoleInvites school={school} admin={admin} role="admin" icon={FiShield}
@@ -940,7 +1069,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         )}
 
         {tab === 'teachers' && (
-          <PeopleSection school={school} role="teacher" actorUid={admin.uid} canDeactivate
+          <PeopleSection school={school} role="teacher" actor={admin} canDeactivate
             accountsTitle="Teacher accounts" icon={FiUserCheck}
             inviteUI={
               <RoleInvites school={school} admin={admin} role="teacher" icon={FiUserCheck}
@@ -950,13 +1079,13 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         )}
 
         {tab === 'students' && (
-          <PeopleSection school={school} role="student" actorUid={admin.uid} canDeactivate
+          <PeopleSection school={school} role="student" actor={admin} canDeactivate
             accountsTitle="Student accounts" icon={FiUsers}
             inviteUI={<StudentInvites school={school} admin={admin} />} />
         )}
 
         {tab === 'parents' && (
-          <PeopleSection school={school} role="parent" actorUid={admin.uid} canDeactivate
+          <PeopleSection school={school} role="parent" actor={admin} canDeactivate
             accountsTitle="Parent accounts" icon={FiUsers}
             inviteUI={
               <RoleInvites school={school} admin={admin} role="parent" icon={FiUsers}
@@ -964,6 +1093,8 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
                 description="Invite a parent. When they sign up with this email they can follow their child's progress." />
             } />
         )}
+
+        {tab === 'history' && <AuditLog school={school} />}
 
         {tab === 'settings' && isSuper && (
           <div className="space-y-6">
