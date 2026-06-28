@@ -26,18 +26,38 @@ const ago = (ts) => {
   return `${d}d ago`;
 };
 
+const ROLE = { admin: 'school admin', teacher: 'teacher', student: 'student', parent: 'parent' };
+const MEMBER_CAP = 150; // safety cap so a huge platform can't blow the token budget
+
 // Turn the live platform data into a compact, factual snapshot the AI reasons
-// over. Flags are computed here (deterministic) so the AI never has to guess.
-function buildSnapshot({ stats, schools, activity, schoolName, generatedAt }) {
+// over. Flags are computed here (deterministic) so the AI never has to guess,
+// and the actual people in each school are listed so it can answer "who" too.
+function buildSnapshot({ stats, schools, members, activity, schoolName, generatedAt }) {
   const suspended = schools.filter((s) => (s.status || 'active').toLowerCase() !== 'active').length;
   const totals = `${stats.student} students, ${stats.teacher} teachers, ${stats.admin} school admins, ${stats.parent} parents across ${schools.length} school(s) (${suspended} not active). ${stats.deactivated} account(s) deactivated. ${stats.total} active accounts in total.`;
+
+  // Group the real accounts by school (capped for very large platforms).
+  const capped = (members || []).slice(0, MEMBER_CAP);
+  const truncated = (members || []).length > MEMBER_CAP;
+  const bySchoolMembers = {};
+  capped.forEach((m) => {
+    const sid = m.schoolId || '__none__';
+    (bySchoolMembers[sid] = bySchoolMembers[sid] || []).push(m);
+  });
+  const memberLine = (m) =>
+    `  - ${m.displayName || m.email || 'Unnamed'} — ${ROLE[m.userType] || m.userType || 'unknown role'} (${(m.status || 'active').toLowerCase()})`;
 
   const schoolLines = schools
     .map((s) => {
       const b = stats.bySchool[s.id] || { student: 0, teacher: 0, admin: 0, parent: 0 };
-      return `- ${s.name} (${(s.status || 'active').toLowerCase()}): ${b.student || 0} students, ${b.teacher || 0} teachers, ${b.admin || 0} admins, ${b.parent || 0} parents`;
+      const summary = `${b.student || 0} students, ${b.teacher || 0} teachers, ${b.admin || 0} school admins, ${b.parent || 0} parents`;
+      const list = bySchoolMembers[s.id] || [];
+      const people = list.length ? list.map(memberLine).join('\n') : '  (no members yet)';
+      return `${s.name} (${(s.status || 'active').toLowerCase()}) — ${summary}:\n${people}`;
     })
     .join('\n');
+  const orphans = bySchoolMembers.__none__ || [];
+  const orphanBlock = orphans.length ? `\nNot assigned to any school:\n${orphans.map(memberLine).join('\n')}` : '';
 
   const flags = [];
   schools.forEach((s) => {
@@ -60,8 +80,8 @@ function buildSnapshot({ stats, schools, activity, schoolName, generatedAt }) {
   return `PLATFORM SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
 Totals: ${totals}
 
-Schools:
-${schoolLines || '(no schools yet)'}
+Schools and the people in them${truncated ? ` (showing the first ${MEMBER_CAP} of ${members.length} accounts)` : ''}:
+${schoolLines || '(no schools yet)'}${orphanBlock}
 
 Flags (computed):
 ${flags.length ? flags.map((f) => `- ${f}`).join('\n') : '- none'}
@@ -84,15 +104,16 @@ const PlatformInsights = () => {
     setError('');
     setAnswer('');
     try {
-      const [stats, schools, activity] = await Promise.all([
+      const [stats, schools, members, activity] = await Promise.all([
         accountService.platformStats(),
         schoolService.listSchools(),
+        accountService.listAll(),
         auditService.listRecent(25),
       ]);
       const schoolName = {};
       schools.forEach((s) => { schoolName[s.id] = s.name; });
       const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-      const snap = buildSnapshot({ stats, schools, activity, schoolName, generatedAt });
+      const snap = buildSnapshot({ stats, schools, members, activity, schoolName, generatedAt });
       setSnapshot(snap);
       const text = await aiInsights.platformBriefing({ snapshot: snap });
       setBriefing(text);
