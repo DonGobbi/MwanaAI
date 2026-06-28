@@ -284,9 +284,9 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
 
   return (
     <div>
-      {/* Toolbar: search + status filter (scales to thousands of accounts) */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-        <div className="relative flex-1">
+      {/* Toolbar: search + always-visible status filter chips */}
+      <div className="mb-3 space-y-2">
+        <div className="relative">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             value={search}
@@ -295,20 +295,40 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
             className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
-        >
-          <option value="all">All ({counts.nonArchived})</option>
-          <option value="active">Active ({counts.active})</option>
-          <option value="deactivated">Deactivated ({counts.deactivated})</option>
-          <option value="archived">Archived ({counts.archived})</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { key: 'all', label: 'All', n: counts.nonArchived },
+            { key: 'active', label: 'Active', n: counts.active },
+            { key: 'deactivated', label: 'Deactivated', n: counts.deactivated },
+            { key: 'archived', label: 'Archived', n: counts.archived },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-primary-600 text-white'
+                  : f.key === 'archived' && f.n > 0
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {f.label} ({f.n})
+            </button>
+          ))}
+        </div>
       </div>
 
+      {statusFilter === 'archived' && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3">
+          Archived accounts can't sign in and are kept for {ARCHIVE_RETENTION_DAYS} days. Restore one anytime from its ⋮ menu.
+        </p>
+      )}
+
       {filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 py-6 text-center">No accounts match your search.</p>
+        <p className="text-sm text-gray-400 py-6 text-center">
+          {statusFilter === 'archived' ? 'No archived accounts.' : 'No accounts match your search.'}
+        </p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {pageItems.map((u) => {
