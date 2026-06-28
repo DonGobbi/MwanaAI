@@ -9,6 +9,7 @@ import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import { calculateAge } from '../utils/age';
 import Spinner, { PageLoader } from '../components/Spinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
@@ -103,6 +104,7 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
   const [busyId, setBusyId] = useState('');
   const [openId, setOpenId] = useState('');
   const [note, setNote] = useState({}); // uid -> transient message
+  const [confirmUser, setConfirmUser] = useState(null); // member pending deactivation
 
   const load = useCallback(async () => {
     try {
@@ -127,8 +129,11 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
       await accountService.setStatus(u.uid, status, actorUid);
       setMembers((p) => p.map((m) => (m.uid === u.uid ? { ...m, status } : m)));
     } catch (err) {
-      console.error(err);
-      flash(u.uid, 'Could not update the account.');
+      console.error('setStatus failed:', err);
+      const msg = err?.code === 'permission-denied'
+        ? "Permission denied. If you just set this up, the latest security rules may not be published yet."
+        : 'Could not update the account. Please try again.';
+      flash(u.uid, msg);
     } finally {
       setBusyId('');
     }
@@ -147,6 +152,7 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
   if (members.length === 0) return <p className="text-sm text-gray-400">No {role} accounts yet — invites appear here once they sign up.</p>;
 
   return (
+    <>
     <ul className="divide-y divide-gray-100">
       {members.map((u) => {
         const status = (u.status || 'active').toLowerCase();
@@ -176,13 +182,13 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
                 </button>
               ) : (
                 <button disabled={busyId === u.uid}
-                  onClick={() => { if (window.confirm(`Deactivate ${u.displayName || u.email}? They won't be able to sign in until reactivated.`)) changeStatus(u, 'deactivated'); }}
+                  onClick={() => setConfirmUser(u)}
                   className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
                   <FiSlash className="w-3.5 h-3.5" /> Deactivate
                 </button>
               ))}
             </div>
-            {note[u.uid] && <p className="text-xs text-green-600 mt-1">{note[u.uid]}</p>}
+            {note[u.uid] && <p className={`text-xs mt-1 ${note[u.uid].includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{note[u.uid]}</p>}
             {open && (
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3 text-xs">
                 <div><p className="text-gray-400">Gender</p><p className="text-gray-800">{u.gender || '—'}</p></div>
@@ -195,6 +201,17 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
         );
       })}
     </ul>
+    <ConfirmDialog
+      open={!!confirmUser}
+      tone="danger"
+      title={`Deactivate ${confirmUser?.displayName || confirmUser?.email || 'this account'}?`}
+      message="They won't be able to sign in until you reactivate them. Their data is kept."
+      confirmLabel="Deactivate"
+      busy={!!confirmUser && busyId === confirmUser.uid}
+      onCancel={() => setConfirmUser(null)}
+      onConfirm={async () => { const u = confirmUser; await changeStatus(u, 'deactivated'); setConfirmUser(null); }}
+    />
+    </>
   );
 };
 
@@ -649,6 +666,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
   const [msg, setMsg] = useState('');
   const [schoolStatus, setSchoolStatus] = useState((school.status || 'active').toLowerCase());
   const [statusBusy, setStatusBusy] = useState(false);
+  const [confirmSuspend, setConfirmSuspend] = useState(false);
 
   const changeSchoolStatus = async (status) => {
     setStatusBusy(true); setMsg('');
@@ -792,7 +810,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => { if (window.confirm(`Suspend ${school.name}? Everyone at this school will be unable to sign in until you restore access.`)) changeSchoolStatus('suspended'); }}
+                    onClick={() => setConfirmSuspend(true)}
                     disabled={statusBusy}
                     className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                     {statusBusy ? <Spinner className="w-4 h-4" /> : <><FiSlash /> Suspend school</>}
@@ -803,6 +821,17 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmSuspend}
+        tone="danger"
+        title={`Suspend ${school.name}?`}
+        message="Everyone at this school — admins, teachers, students and parents — will be unable to sign in until you restore access."
+        confirmLabel="Suspend school"
+        busy={statusBusy}
+        onCancel={() => setConfirmSuspend(false)}
+        onConfirm={async () => { await changeSchoolStatus('suspended'); setConfirmSuspend(false); }}
+      />
     </div>
   );
 };
