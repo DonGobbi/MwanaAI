@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Logo from '../components/Logo';
 import ThemeToggle from '../components/ThemeToggle';
+import AccountMenu from '../components/AccountMenu';
 import { TermsContent, PrivacyContent } from '../components/LegalContent';
 import { useAuth } from '../contexts/AuthContext';
 import firebaseService from '../services/firebaseService';
@@ -398,13 +399,7 @@ const Profile = () => {
           </button>
           <div className="flex-1" />
           <ThemeToggle />
-          <button
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 rounded-full border border-gray-200 pl-1 pr-3 py-1 hover:bg-gray-50 transition-colors"
-          >
-            <span className="w-8 h-8 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">{initials}</span>
-            <span className="hidden sm:inline text-sm font-medium text-gray-700">{userData.name || 'Account'}</span>
-          </button>
+          <AccountMenu />
         </div>
       </header>
 
