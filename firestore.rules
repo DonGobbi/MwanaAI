@@ -101,7 +101,7 @@ service cloud.firestore {
       allow create: if isSuperadmin()
         || (isSchoolAdmin()
             && request.resource.data.schoolId == myUser().schoolId
-            && request.resource.data.role in ['teacher', 'student']);
+            && request.resource.data.role in ['admin', 'teacher', 'student', 'parent']);
       allow delete: if isSuperadmin()
         || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId);
       allow update: if isSuperadmin()

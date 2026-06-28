@@ -1,9 +1,15 @@
 import { db } from '../config/firebase';
 import { collection, doc, setDoc, getDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
-// A Super Admin's school. Lean model for now: one school per Super Admin, with
-// School Admins (delegates) attached to it via their profile's schoolId.
+// Schools are the top level. A Super Admin registers and manages many schools;
+// each School Admin is attached to one school via their profile's schoolId.
 export const schoolService = {
+  // Every registered school (Super Admin view), newest first.
+  async listSchools() {
+    const snap = await getDocs(collection(db, 'schools'));
+    return snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+
   async getMySchool(uid) {
     if (!uid) return null;
     const snap = await getDocs(query(collection(db, 'schools'), where('createdBy', '==', uid)));

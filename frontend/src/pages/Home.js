@@ -594,14 +594,14 @@ const AdminHome = ({ firstName, role }) => {
       <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-sm">
         <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
         <p className="text-primary-50 mt-1">
-          {isSuper ? 'Manage your school, classes, subjects and people.' : "Manage your school's teachers and students."}
+          {isSuper ? 'Register schools and manage their admins, teachers, students and parents.' : "Manage your school's admins, teachers, students and parents."}
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DashboardCard to="/admin" icon={FiHome} title="School administration"
+        <DashboardCard to="/admin" icon={FiHome} title={isSuper ? 'Schools' : 'My School'}
           text={isSuper
-            ? 'Set up your school, add school admins, and enrol teachers & students.'
-            : 'Enrol teachers & students into their classes and subjects.'}
+            ? 'Register a school, then open it to add admins, teachers, students and parents.'
+            : 'Add admins, teachers, students and parents to your school.'}
           color="bg-sky-100 text-sky-600" />
         <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
       </div>
