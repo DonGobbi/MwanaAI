@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
@@ -101,7 +101,9 @@ const StatusBadge = ({ status }) => {
 
 const Profile = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const { tab } = useParams();
+  // The URL drives which tab is shown: /profile (info) or /profile/account.
+  const activeTab = tab === 'account' ? 'account' : 'profile';
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -449,7 +451,7 @@ const Profile = () => {
               <div className="border-t border-gray-200">
                 <nav className="flex flex-col">
                   <button
-                    onClick={() => setActiveTab('profile')}
+                    onClick={() => navigate('/profile')}
                     className={`flex items-center px-6 py-3 text-sm font-medium ${
                       activeTab === 'profile'
                         ? 'bg-primary-50 text-primary-600 border-l-4 border-primary-600'
@@ -463,7 +465,7 @@ const Profile = () => {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('account')}
+                    onClick={() => navigate('/profile/account')}
                     className={`flex items-center px-6 py-3 text-sm font-medium ${
                       activeTab === 'account'
                         ? 'bg-primary-50 text-primary-600 border-l-4 border-primary-600'

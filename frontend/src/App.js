@@ -58,6 +58,7 @@ const RoutesTree = ({ location }) => (
     <Route path="/admin/*" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     <Route path="/child" element={<ProtectedRoute><ParentChild /></ProtectedRoute>} />
     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+    <Route path="/profile/:tab" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );
