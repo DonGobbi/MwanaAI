@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import Button from '../components/Button';
 import Logo from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +31,7 @@ const Signup = () => {
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Pre-fill from an invite link (/signup?email=&role=&grade=&subjects=&school=).
   useEffect(() => {
@@ -282,16 +284,25 @@ const Signup = () => {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <div className="mt-1">
+              <div className="mt-1 relative">
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${errors.password ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm`}
+                  className={`appearance-none block w-full px-3 py-2 pr-10 border ${errors.password ? 'border-red-300' : 'border-gray-300'} rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
+                </button>
                 {errors.password && (
                   <p className="mt-2 text-sm text-red-600">{errors.password}</p>
                 )}
@@ -306,7 +317,7 @@ const Signup = () => {
                 <input
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}

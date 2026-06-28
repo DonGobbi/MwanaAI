@@ -202,6 +202,15 @@ export const AuthProvider = ({ children }) => {
     }));
   };
 
+  // Send a password-reset email (self-service "Forgot password"). Normalise the
+  // email the same way login/register do so it matches the stored account.
+  const resetPassword = async (email) => {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) throw new Error('Please enter your email address.');
+    await firebaseService.resetPassword(clean);
+    return true;
+  };
+
   // Logout function
   const logout = async () => {
     try {
@@ -222,6 +231,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
+    resetPassword,
     updateGradeLevel,
     updateCourses,
     isAuthenticated: () => !!currentUser,
