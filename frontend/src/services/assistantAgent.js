@@ -14,6 +14,14 @@ import { emailService } from './emailService';
 // admin sees the whole platform; a school admin sees only their own school.
 
 const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'School Admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
+// Natural phrases people use → the canonical role value.
+const ROLE_ALIASES = {
+  admin: 'admin', 'school admin': 'admin', schooladmin: 'admin', 'school administrator': 'admin', administrator: 'admin', 'school-admin': 'admin',
+  teacher: 'teacher', tutor: 'teacher', instructor: 'teacher', educator: 'teacher',
+  student: 'student', pupil: 'student', learner: 'student',
+  parent: 'parent', guardian: 'parent',
+};
+const normalizeRole = (r) => ROLE_ALIASES[(r || '').trim().toLowerCase()] || (r || '').trim().toLowerCase();
 const MAX_STEPS = 5;
 const dateStr = (ts) => (ts ? new Date(ts).toDateString() : '');
 
@@ -211,12 +219,12 @@ const TOOLS = {
     return { proposal: { type: 'reactivate_account', uid: u.uid, name: u.displayName || u.email, summary: `Reactivate ${u.displayName || u.email}`, confirmLabel: 'Reactivate account' } };
   },
   async invite_user(args, viewer) {
-    const role = (args.role || '').toLowerCase();
-    if (!['admin', 'teacher', 'student', 'parent'].includes(role)) return { error: 'Role must be admin, teacher, student or parent.' };
-    if (!args.email || !args.email.includes('@')) return { error: 'A valid email address is required to invite someone.' };
+    const role = normalizeRole(args.role);
+    if (!['admin', 'teacher', 'student', 'parent'].includes(role)) return { error: 'Role must be a school admin, teacher, student or parent.' };
+    if (!args.email || !args.email.includes('@')) return { error: `A valid email address is required to invite a ${ROLE_LABEL[role] || role}. What is their email?` };
     const s = await findSchool(args.school, viewer);
     if (!s) return { error: `No school matching "${args.school}". Which school should they join?` };
-    return { proposal: { type: 'invite_user', schoolId: s.id, schoolName: s.name, email: args.email.trim().toLowerCase(), role, summary: `Invite ${args.email.trim().toLowerCase()} as a ${role} to ${s.name}`, impact: 'an invitation email will be sent to them', confirmLabel: 'Send invite' } };
+    return { proposal: { type: 'invite_user', schoolId: s.id, schoolName: s.name, email: args.email.trim().toLowerCase(), role, summary: `Invite ${args.email.trim().toLowerCase()} as a ${ROLE_LABEL[role] || role} to ${s.name}`, impact: 'an invitation email will be sent to them', confirmLabel: 'Send invite' } };
   },
   async add_subject(args, viewer) {
     if (!args.subject) return { error: 'Which subject should I add?' };
@@ -331,7 +339,7 @@ const TOOL_DEFS = [
   },
   {
     type: 'function',
-    function: { name: 'invite_user', description: 'Prepare to invite a new person (sends an invitation email on confirm). Requires user confirmation.', parameters: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string', description: 'admin, teacher, student or parent' }, school: { type: 'string' } }, required: ['email', 'role', 'school'] } },
+    function: { name: 'invite_user', description: 'Prepare to invite a new person (sends an invitation email on confirm). Requires user confirmation. A "school admin" / "administrator" is the role "admin".', parameters: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string', description: 'one of: admin (a school admin/administrator), teacher, student, parent. Natural phrases like "school admin" map to admin.' }, school: { type: 'string' } }, required: ['email', 'role', 'school'] } },
   },
   {
     type: 'function',
