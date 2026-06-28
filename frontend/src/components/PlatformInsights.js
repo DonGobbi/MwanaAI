@@ -256,10 +256,10 @@ const PlatformInsights = () => {
           messages.map((m) => (
             <div key={m.id} className={m.role === 'user' ? 'flex justify-end' : ''}>
               {m.role === 'user' ? (
-                <div className="max-w-[85%] bg-primary-600 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm whitespace-pre-wrap">{m.content}</div>
+                <div className="max-w-[85%] bg-primary-600 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm whitespace-pre-wrap break-words">{m.content}</div>
               ) : (
-                <div className="max-w-[92%]">
-                  <div className="bg-gray-50 rounded-2xl rounded-bl-sm px-3.5 py-2.5">
+                <div className="max-w-[92%] min-w-0">
+                  <div className="bg-gray-50 rounded-2xl rounded-bl-sm px-3.5 py-2.5 break-words overflow-hidden">
                     {m.error ? <p className="text-sm text-red-600">{m.error}</p> : <Markdown content={m.content} />}
                   </div>
 
