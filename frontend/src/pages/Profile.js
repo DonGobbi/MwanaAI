@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FiUser, FiShield, FiFileText, FiLock, FiLogOut, FiArrowLeft, FiCamera } from 'react-icons/fi';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import Logo from '../components/Logo';
+import ThemeToggle from '../components/ThemeToggle';
+import { TermsContent, PrivacyContent } from '../components/LegalContent';
 import { useAuth } from '../contexts/AuthContext';
 import firebaseService from '../services/firebaseService';
 import { generateThumbnail } from '../services/fileUploadService';
@@ -103,8 +106,9 @@ const StatusBadge = ({ status }) => {
 const Profile = () => {
   const navigate = useNavigate();
   const { tab } = useParams();
-  // The URL drives which tab is shown: /profile (info) or /profile/security.
-  const activeTab = tab === 'security' ? 'security' : 'profile';
+  // The URL drives which panel shows on the right — the left nav stays put:
+  // /profile, /profile/security, /profile/terms, /profile/privacy.
+  const activeTab = ['security', 'terms', 'privacy'].includes(tab) ? tab : 'profile';
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -386,25 +390,40 @@ const Profile = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Top bar — the way back out of the full-screen Settings page. */}
+      {/* App bar — logo (left), theme toggle + account (right). */}
       <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="container py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900">
-            <FiArrowLeft className="w-4 h-4" /> Back to Dashboard
+        <div className="container h-16 flex items-center gap-2">
+          <button onClick={() => navigate('/')} className="flex items-center" aria-label="MwanaAI home">
+            <Logo size={36} />
           </button>
-          <span className="text-sm font-semibold text-gray-400">Settings</span>
+          <div className="flex-1" />
+          <ThemeToggle />
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 rounded-full border border-gray-200 pl-1 pr-3 py-1 hover:bg-gray-50 transition-colors"
+          >
+            <span className="w-8 h-8 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">{initials}</span>
+            <span className="hidden sm:inline text-sm font-medium text-gray-700">{userData.name || 'Account'}</span>
+          </button>
         </div>
       </header>
+
       <div className="container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Settings nav */}
+        {/* Back link + page title (full width, above the two columns). */}
+        <button onClick={() => navigate('/')} className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1.5">
+          <FiArrowLeft className="w-4 h-4" /> Back to Dashboard
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 mt-3">Settings</h1>
+        <p className="text-sm text-gray-400 mb-6">
+          {[userData.email, ROLE_LABELS[accountMeta.role] || accountMeta.role].filter(Boolean).join(' · ')}
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+          {/* Settings nav — static; only the right panel changes. */}
           <div className="lg:col-span-1">
             <Card className="sticky top-20">
               <div className="p-4">
-                <h2 className="text-lg font-bold text-gray-900">Settings</h2>
-                <p className="text-xs text-gray-400 truncate">
-                  {[userData.email, ROLE_LABELS[accountMeta.role] || accountMeta.role].filter(Boolean).join(' · ')}
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Account settings</p>
 
                 {/* Avatar + photo */}
                 <div className="flex items-center gap-3 mt-4">
@@ -450,8 +469,12 @@ const Profile = () => {
                 <div>
                   <p className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Resources</p>
                   <div className="space-y-1">
-                    <Link to="/terms" className={navItem(false)}><FiFileText className="w-4 h-4 flex-shrink-0" /> Terms of Use</Link>
-                    <Link to="/privacy" className={navItem(false)}><FiLock className="w-4 h-4 flex-shrink-0" /> Privacy Policy</Link>
+                    <button onClick={() => navigate('/profile/terms')} className={navItem(activeTab === 'terms')}>
+                      <FiFileText className="w-4 h-4 flex-shrink-0" /> Terms of Use
+                    </button>
+                    <button onClick={() => navigate('/profile/privacy')} className={navItem(activeTab === 'privacy')}>
+                      <FiLock className="w-4 h-4 flex-shrink-0" /> Privacy Policy
+                    </button>
                   </div>
                 </div>
                 <div className="border-t border-gray-100 pt-2">
@@ -901,6 +924,22 @@ const Profile = () => {
                     </div>
                     )}
                   </div>
+                </Card.Body>
+              </Card>
+            )}
+
+            {activeTab === 'terms' && (
+              <Card>
+                <Card.Body className="prose prose-sm max-w-none">
+                  <TermsContent />
+                </Card.Body>
+              </Card>
+            )}
+
+            {activeTab === 'privacy' && (
+              <Card>
+                <Card.Body className="prose prose-sm max-w-none">
+                  <PrivacyContent />
                 </Card.Body>
               </Card>
             )}

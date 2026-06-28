@@ -86,11 +86,12 @@ function AppRoutes() {
     // It carries its own "← Back to Dashboard" bar instead.
     const fullScreen = /^\/profile(\/|$)/.test(location.pathname);
     if (fullScreen) {
+      // No per-path key here: switching Settings tabs (Profile/Security/Terms/
+      // Privacy) keeps the page mounted so the left nav stays put and only the
+      // right panel changes — no reflow or re-animation.
       return (
         <div className="min-h-screen bg-gray-50">
-          <div key={location.pathname} className="page-transition">
-            <RoutesTree location={location} />
-          </div>
+          <RoutesTree location={location} />
         </div>
       );
     }
