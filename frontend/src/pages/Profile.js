@@ -386,18 +386,24 @@ const Profile = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen">
+      {/* Top bar — the way back out of the full-screen Settings page. */}
+      <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        <div className="container py-3 flex items-center justify-between">
+          <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+            <FiArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
+          <span className="text-sm font-semibold text-gray-400">Settings</span>
+        </div>
+      </header>
       <div className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Settings nav */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-24">
+            <Card className="sticky top-20">
               <div className="p-4">
-                <button onClick={() => navigate('/')} className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1.5 mb-4">
-                  <FiArrowLeft className="w-4 h-4" /> Back to Dashboard
-                </button>
                 <h2 className="text-lg font-bold text-gray-900">Settings</h2>
                 <p className="text-xs text-gray-400 truncate">
-                  {userData.email}{accountMeta.role ? ` · ${ROLE_LABELS[accountMeta.role] || accountMeta.role}` : ''}
+                  {[userData.email, ROLE_LABELS[accountMeta.role] || accountMeta.role].filter(Boolean).join(' · ')}
                 </p>
 
                 {/* Avatar + photo */}

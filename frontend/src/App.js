@@ -82,6 +82,18 @@ function AppRoutes() {
 
   // Authenticated app — sidebar shell.
   if (currentUser) {
+    // Settings/Profile is a focused, full-screen page: no sidebar, no topbar.
+    // It carries its own "← Back to Dashboard" bar instead.
+    const fullScreen = /^\/profile(\/|$)/.test(location.pathname);
+    if (fullScreen) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <div key={location.pathname} className="page-transition">
+            <RoutesTree location={location} />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50">
         <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
