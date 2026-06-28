@@ -14,10 +14,64 @@ import {
   reauthenticateWithCredential,
   GoogleAuthProvider,
   FacebookAuthProvider,
+  OAuthProvider,
   linkWithPopup,
   unlink,
   deleteUser
 } from 'firebase/auth';
+
+// OAuth providers a user can link. LinkedIn uses Firebase's generic OpenID
+// Connect provider id 'oidc.linkedin'. Each must be enabled in the Firebase
+// console (Authentication → Sign-in method) for linking to actually work.
+const LINK_PROVIDERS = [
+  {
+    id: 'google', label: 'Google', providerId: 'google.com',
+    make: () => new GoogleAuthProvider(),
+    icon: (
+      <svg className="w-8 h-8 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'facebook', label: 'Facebook', providerId: 'facebook.com',
+    make: () => new FacebookAuthProvider(),
+    icon: (
+      <svg className="w-8 h-8 text-[#1877F2]" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'linkedin', label: 'LinkedIn', providerId: 'oidc.linkedin',
+    make: () => new OAuthProvider('oidc.linkedin'),
+    icon: (
+      <svg className="w-8 h-8 text-[#0A66C2]" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z" />
+      </svg>
+    ),
+  },
+];
+
+const friendlyProviderError = (err, label) => {
+  switch (err?.code) {
+    case 'auth/operation-not-allowed':
+      return `${label} sign-in isn't enabled yet. Enable it in the Firebase console (Authentication → Sign-in method).`;
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return ''; // user simply closed the popup — not an error worth showing
+    case 'auth/credential-already-in-use':
+    case 'auth/account-exists-with-different-credential':
+      return `That ${label} account is already linked to another user.`;
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the popup. Allow popups and try again.';
+    default:
+      return err?.message || `Could not connect ${label}.`;
+  }
+};
 
 const ROLE_LABELS = {
   superadmin: 'Super Admin',
@@ -62,7 +116,7 @@ const Profile = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // OAuth providers state
-  const [isLinkingProvider, setIsLinkingProvider] = useState(false);
+  const [linkingProvider, setLinkingProvider] = useState(''); // which provider id is busy
   const [providerError, setProviderError] = useState('');
   const [linkedProviders, setLinkedProviders] = useState([]);
   const [isPasswordAccount, setIsPasswordAccount] = useState(true);
@@ -154,6 +208,7 @@ const Profile = () => {
       (authUser?.providerData || []).forEach((provider) => {
         if (provider.providerId === 'google.com') providers.push('google');
         else if (provider.providerId === 'facebook.com') providers.push('facebook');
+        else if (provider.providerId === 'oidc.linkedin') providers.push('linkedin');
         else if (provider.providerId === 'password') hasPassword = true;
       });
       setLinkedProviders(providers);
@@ -286,6 +341,29 @@ const Profile = () => {
       }
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  // Link/unlink one OAuth provider. Only the clicked provider shows a busy
+  // state (tracked by id), so clicking Google doesn't spin Facebook/LinkedIn.
+  const toggleProvider = async (p) => {
+    setProviderError('');
+    setLinkingProvider(p.id);
+    try {
+      const user = firebaseService.getCurrentUser();
+      if (linkedProviders.includes(p.id)) {
+        await unlink(user, p.providerId);
+        setLinkedProviders((prev) => prev.filter((x) => x !== p.id));
+      } else {
+        await linkWithPopup(user, p.make());
+        setLinkedProviders((prev) => [...prev, p.id]);
+      }
+    } catch (err) {
+      console.error(`${p.label} link error:`, err);
+      const msg = friendlyProviderError(err, p.label);
+      if (msg) setProviderError(msg);
+    } finally {
+      setLinkingProvider('');
     }
   };
 
@@ -716,83 +794,32 @@ const Profile = () => {
                       )}
 
                       <div className="mt-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <svg className="w-8 h-8 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                            </svg>
-                            <span className="ml-3 text-sm font-medium text-gray-700">Google</span>
-                          </div>
-                          <Button
-                            variant={linkedProviders.includes('google') ? "danger" : "outline"}
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                setIsLinkingProvider(true);
-                                setProviderError('');
-                                const user = firebaseService.getCurrentUser();
-                                if (linkedProviders.includes('google')) {
-                                  await unlink(user, GoogleAuthProvider.PROVIDER_ID);
-                                  setLinkedProviders(linkedProviders.filter(p => p !== 'google'));
-                                } else {
-                                  const provider = new GoogleAuthProvider();
-                                  await linkWithPopup(user, provider);
-                                  setLinkedProviders([...linkedProviders, 'google']);
-                                }
-                              } catch (err) {
-                                console.error('Google auth error:', err);
-                                setProviderError(err.message || 'Failed to connect Google account');
-                              } finally {
-                                setIsLinkingProvider(false);
-                              }
-                            }}
-                            disabled={isLinkingProvider}
-                          >
-                            {isLinkingProvider ? 'Processing...' : linkedProviders.includes('google') ? 'Disconnect' : 'Connect'}
-                          </Button>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <svg className="w-8 h-8 text-[#1877F2]" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                            </svg>
-                            <span className="ml-3 text-sm font-medium text-gray-700">Facebook</span>
-                          </div>
-                          <Button
-                            variant={linkedProviders.includes('facebook') ? "danger" : "outline"}
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                setIsLinkingProvider(true);
-                                setProviderError('');
-                                const user = firebaseService.getCurrentUser();
-                                if (linkedProviders.includes('facebook')) {
-                                  await unlink(user, FacebookAuthProvider.PROVIDER_ID);
-                                  setLinkedProviders(linkedProviders.filter(p => p !== 'facebook'));
-                                } else {
-                                  const provider = new FacebookAuthProvider();
-                                  await linkWithPopup(user, provider);
-                                  setLinkedProviders([...linkedProviders, 'facebook']);
-                                }
-                              } catch (err) {
-                                console.error('Facebook auth error:', err);
-                                setProviderError(err.message || 'Failed to connect Facebook account');
-                              } finally {
-                                setIsLinkingProvider(false);
-                              }
-                            }}
-                            disabled={isLinkingProvider}
-                          >
-                            {isLinkingProvider ? 'Processing...' : linkedProviders.includes('facebook') ? 'Disconnect' : 'Connect'}
-                          </Button>
-                        </div>
+                        {LINK_PROVIDERS.map((p) => {
+                          const connected = linkedProviders.includes(p.id);
+                          const busy = linkingProvider === p.id;
+                          return (
+                            <div key={p.id} className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                {p.icon}
+                                <span className="ml-3 text-sm font-medium text-gray-700">{p.label}</span>
+                              </div>
+                              <Button
+                                variant={connected ? 'danger' : 'outline'}
+                                size="sm"
+                                onClick={() => toggleProvider(p)}
+                                disabled={busy}
+                              >
+                                {busy ? 'Processing...' : connected ? 'Disconnect' : 'Connect'}
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
+                    {/* A Super Admin can't delete their own account from here —
+                        they're the sole owner of the platform. */}
+                    {accountMeta.role !== 'superadmin' && (
                     <div className="pt-6 border-t border-gray-200">
                       <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
 
@@ -886,6 +913,7 @@ const Profile = () => {
                         )}
                       </div>
                     </div>
+                    )}
                   </div>
                 </Card.Body>
               </Card>
