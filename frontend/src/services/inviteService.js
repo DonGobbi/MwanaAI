@@ -5,7 +5,7 @@ import { collection, doc, setDoc, getDocs, deleteDoc, updateDoc, query, where } 
 // is deterministic so re-inviting updates rather than duplicates). When the
 // invited person signs up with that email, their profile is auto-populated.
 export const inviteService = {
-  async create(admin, school, { email, role, gradeLevel = '', gradeLabel = '', subjects = [] }) {
+  async create(admin, school, { email, role, gradeLevel = '', gradeLabel = '', subjects = [], classroomId = '', classroomName = '' }) {
     const clean = (email || '').trim().toLowerCase();
     if (!clean) throw new Error('Email is required.');
     const id = `${school.id}_${clean}`;
@@ -18,6 +18,8 @@ export const inviteService = {
       gradeLevel,
       gradeLabel,
       subjects,
+      classroomId,
+      classroomName,
       status: 'pending',
       invitedBy: admin.uid,
       createdAt: Date.now(),

@@ -372,6 +372,7 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
                     <div><p className="text-gray-400">Age</p><p className="text-gray-800">{age != null ? age : '—'}</p></div>
                     <div><p className="text-gray-400">Phone</p><p className="text-gray-800">{u.phone || '—'}</p></div>
                     <div><p className="text-gray-400">Class</p><p className="text-gray-800">{getGradeLevel(u.gradeLevel)?.label || '—'}</p></div>
+                    {role === 'student' && <div><p className="text-gray-400">Section</p><p className="text-gray-800">{u.classroomName || '—'}</p></div>}
                   </div>
                 )}
               </li>
@@ -589,6 +590,8 @@ const StudentInvites = ({ school, admin }) => {
   const [email, setEmail] = useState('');
   const [gradeLevel, setGradeLevel] = useState('');
   const [subjects, setSubjects] = useState([]);
+  const [classroomId, setClassroomId] = useState('');
+  const [classrooms, setClassrooms] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const { subjects: subjectChoices } = useSchoolSubjects(school.id);
@@ -605,6 +608,13 @@ const StudentInvites = ({ school, admin }) => {
   }, [school.id]);
   useEffect(() => { load(); }, [load]);
 
+  // Active classrooms the student can be assigned to.
+  useEffect(() => {
+    classroomService.listForSchool(school.id)
+      .then((all) => setClassrooms(all.filter((c) => (c.status || 'active') === 'active')))
+      .catch(() => {});
+  }, [school.id]);
+
   const toggle = (v) => setSubjects((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
   const invite = async (e) => {
@@ -616,10 +626,11 @@ const StudentInvites = ({ school, admin }) => {
     setBusy(true);
     try {
       const gradeLabel = getGradeLevel(gradeLevel)?.label || gradeLevel;
-      await inviteService.create(admin, school, { email, role: 'student', gradeLevel, gradeLabel, subjects });
+      const classroom = classrooms.find((c) => c.id === classroomId);
+      await inviteService.create(admin, school, { email, role: 'student', gradeLevel, gradeLabel, subjects, classroomId, classroomName: classroom?.name || '' });
       const sent = await emailService.sendInvite({ email, role: 'student', schoolName: school.name, gradeLevel, gradeLabel, subjects });
-      auditService.log({ schoolId: school.id, actor: admin, action: 'Invited a student', targetType: 'student', targetId: email, targetName: email });
-      setEmail(''); setGradeLevel(''); setSubjects([]); setMsg(sendNote(sent));
+      auditService.log({ schoolId: school.id, actor: admin, action: 'Invited a student', targetType: 'student', targetId: email, targetName: classroom ? `${email} · ${classroom.name}` : email });
+      setEmail(''); setGradeLevel(''); setSubjects([]); setClassroomId(''); setMsg(sendNote(sent));
       load();
     } catch (err) {
       setMsg(err.message || 'Could not create invite.');
@@ -644,13 +655,23 @@ const StudentInvites = ({ school, admin }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="student@example.com"
             className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-          <select value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}
+          <select value={gradeLevel} onChange={(e) => { setGradeLevel(e.target.value); setClassroomId(''); }}
             className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
             <option value="">Class</option>
             <optgroup label="Primary">{GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</optgroup>
             <optgroup label="Secondary">{GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</optgroup>
           </select>
         </div>
+        {(() => {
+          const opts = classrooms.filter((c) => !gradeLevel || c.level === gradeLevel);
+          return opts.length > 0 ? (
+            <select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}
+              className="w-full sm:w-1/2 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+              <option value="">Section / classroom (optional)</option>
+              {opts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          ) : null;
+        })()}
         <div>
           <p className="text-xs text-gray-500 mb-1">Subjects ({subjects.length})</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">

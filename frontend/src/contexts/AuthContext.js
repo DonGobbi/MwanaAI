@@ -76,6 +76,8 @@ export const AuthProvider = ({ children }) => {
                 if (pending.role === 'student') {
                   updates.gradeLevel = pending.gradeLevel || profile?.gradeLevel || '';
                   updates.subjects = pending.subjects?.length ? pending.subjects : profile?.subjects || [];
+                  updates.classroomId = pending.classroomId || profile?.classroomId || '';
+                  updates.classroomName = pending.classroomName || profile?.classroomName || '';
                 }
                 await firebaseService.saveUserProfile(updates);
                 await inviteService.markAccepted(pending.id);
