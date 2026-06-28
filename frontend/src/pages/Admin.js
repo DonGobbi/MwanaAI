@@ -701,6 +701,9 @@ const SchoolsList = ({ admin, onOpen }) => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [schoolSearch, setSchoolSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [confirmSchool, setConfirmSchool] = useState(null); // { school, status }
+  const [busyId, setBusyId] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -727,6 +730,27 @@ const SchoolsList = ({ admin, onOpen }) => {
       setSaving(false);
     }
   };
+
+  const changeSchoolStatus = async (s, status) => {
+    setBusyId(s.id);
+    try {
+      await schoolService.setStatus(s.id, status);
+      setSchools((prev) => prev.map((x) => (x.id === s.id ? { ...x, status } : x)));
+    } catch (err) {
+      console.error('school setStatus failed:', err);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const SCHOOLS_PAGE_SIZE = 9;
+  const q = schoolSearch.trim().toLowerCase();
+  const visibleSchools = q ? schools.filter((s) => (s.name || '').toLowerCase().includes(q)) : schools;
+  useEffect(() => { setPage(0); }, [schoolSearch]);
+  const schoolTotalPages = Math.max(1, Math.ceil(visibleSchools.length / SCHOOLS_PAGE_SIZE));
+  const schoolSafePage = Math.min(page, schoolTotalPages - 1);
+  const schoolStart = schoolSafePage * SCHOOLS_PAGE_SIZE;
+  const pagedSchools = visibleSchools.slice(schoolStart, schoolStart + SCHOOLS_PAGE_SIZE);
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -760,43 +784,85 @@ const SchoolsList = ({ admin, onOpen }) => {
             <p className="font-semibold text-gray-800">No schools yet</p>
             <p className="text-sm text-gray-500">Register your first school above to get started.</p>
           </div>
-        ) : (() => {
-          const q = schoolSearch.trim().toLowerCase();
-          const visible = q ? schools.filter((s) => (s.name || '').toLowerCase().includes(q)) : schools;
-          return (
-            <>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="relative flex-1 max-w-sm">
-                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input value={schoolSearch} onChange={(e) => setSchoolSearch(e.target.value)} placeholder="Search schools"
-                    className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
-                </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">{visible.length} of {schools.length}</span>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="relative flex-1 max-w-sm">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input value={schoolSearch} onChange={(e) => setSchoolSearch(e.target.value)} placeholder="Search schools"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
               </div>
-              {visible.length === 0 ? (
-                <p className="text-sm text-gray-400 py-6 text-center">No schools match your search.</p>
-              ) : (
+              <span className="text-xs text-gray-400 flex-shrink-0">{visibleSchools.length} of {schools.length}</span>
+            </div>
+            {visibleSchools.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">No schools match your search.</p>
+            ) : (
+              <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {visible.map((s) => (
-                    <button key={s.id} onClick={() => onOpen(s)}
-                      className="text-left card p-5 hover:shadow-md hover:border-primary-200 flex items-center justify-between transition-all">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <FiHome className="text-primary-600 flex-shrink-0" />
-                          <p className="font-semibold text-gray-800 truncate">{s.name}</p>
-                          {(s.status || 'active').toLowerCase() !== 'active' && <AccountStatusBadge status={s.status} />}
+                  {pagedSchools.map((s) => {
+                    const suspended = (s.status || 'active').toLowerCase() !== 'active';
+                    return (
+                      <div key={s.id} className="card p-5 flex items-center justify-between gap-3">
+                        <button onClick={() => onOpen(s)} className="flex items-center gap-3 text-left min-w-0 flex-1 group">
+                          <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center flex-shrink-0"><FiHome className="w-5 h-5" /></div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-800 truncate group-hover:text-primary-700">{s.name}</p>
+                              <AccountStatusBadge status={s.status} />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'}</p>
+                          </div>
+                        </button>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <button onClick={() => onOpen(s)} className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 font-medium">
+                            Manage <FiArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          {suspended ? (
+                            <button disabled={busyId === s.id} onClick={() => setConfirmSchool({ school: s, status: 'active' })}
+                              className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                              <FiRefreshCw className="w-3.5 h-3.5" /> Restore
+                            </button>
+                          ) : (
+                            <button disabled={busyId === s.id} onClick={() => setConfirmSchool({ school: s, status: 'suspended' })}
+                              className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                              <FiSlash className="w-3.5 h-3.5" /> Suspend
+                            </button>
+                          )}
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}</p>
                       </div>
-                      <FiArrowRight className="text-primary-600 flex-shrink-0 ml-3" />
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
-            </>
-          );
-        })()}
+                {schoolTotalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                    <p className="text-xs text-gray-400">Showing {schoolStart + 1}–{Math.min(visibleSchools.length, schoolStart + SCHOOLS_PAGE_SIZE)} of {visibleSchools.length}</p>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={schoolSafePage === 0} aria-label="Previous page"
+                        className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                      <span className="text-xs text-gray-500 px-2 tabular-nums">Page {schoolSafePage + 1} of {schoolTotalPages}</span>
+                      <button onClick={() => setPage((p) => Math.min(schoolTotalPages - 1, p + 1))} disabled={schoolSafePage >= schoolTotalPages - 1} aria-label="Next page"
+                        className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={!!confirmSchool}
+        tone={confirmSchool?.status === 'active' ? 'primary' : 'danger'}
+        title={`${confirmSchool?.status === 'active' ? 'Restore' : 'Suspend'} ${confirmSchool?.school?.name || 'this school'}?`}
+        message={confirmSchool?.status === 'active'
+          ? 'Everyone at this school will be able to sign in again.'
+          : 'Everyone at this school — admins, teachers, students and parents — will be unable to sign in until you restore access.'}
+        confirmLabel={confirmSchool?.status === 'active' ? 'Restore access' : 'Suspend school'}
+        busy={!!confirmSchool && busyId === confirmSchool.school.id}
+        onCancel={() => setConfirmSchool(null)}
+        onConfirm={async () => { const { school, status } = confirmSchool; await changeSchoolStatus(school, status); setConfirmSchool(null); }}
+      />
     </div>
   );
 };
