@@ -168,7 +168,7 @@ const TOOL_DEFS = [
     type: 'function',
     function: {
       name: 'find_people',
-      description: 'Find or list people (accounts). Filter by role, school, status, or a name/email search. Use for "who are the teachers", "list the students at X", "find <name>", "everyone\'s emails".',
+      description: 'Returns the ACTUAL people (their NAMES, emails, roles, school and status). Use this whenever names, a list of people, emails, or "everyone"/"everything" are requested — get_stats only gives counts, never names. Filter by role, school, status, or a name/email search; call with no filters to list everyone.',
       parameters: {
         type: 'object',
         properties: {
@@ -208,7 +208,7 @@ const TOOL_DEFS = [
     type: 'function',
     function: {
       name: 'get_stats',
-      description: 'Headcounts and totals — number of students, teachers, school admins, parents, and schools.',
+      description: 'Headcounts and totals ONLY (the NUMBER of students, teachers, school admins, parents and schools). Does NOT return any names — for names use find_people.',
       parameters: { type: 'object', properties: {} },
     },
   },
@@ -221,7 +221,12 @@ function systemPrompt(viewer) {
     : `You are assisting a SCHOOL ADMINISTRATOR of "${viewer.schoolName || 'their school'}". You may ONLY look up data for that one school; you cannot and must not report on other schools.`;
   return `You are the operations assistant for MwanaAI, an education platform for schools in Malawi. ${scope}
 You are speaking with ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} (${ROLE_LABEL[viewer.role] || viewer.role}); when they say "me", "I" or "my", they mean this person.
-You have tools that read LIVE data from the database. To answer, CALL the tools to fetch exactly what you need — never guess or invent names, numbers, emails, schools or activity, and never rely on memory. You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown, kept concise. If the data genuinely has no answer (a person who doesn't exist, a student with no activity yet, etc.), say so plainly.`;
+You have tools that read LIVE data from the database. Always CALL the tools to get facts — never guess, invent or rely on memory.
+How to choose tools:
+- If the request mentions NAMES, a LIST of people, emails, or "everyone"/"everything", you MUST call find_people to fetch the actual people. Counts from get_stats are NOT enough — get_stats has no names.
+- For a "full summary of everything", call find_people (the people, with names), get_schools (schools, classrooms, subjects) AND get_stats (totals) before answering, then list the actual names.
+- Use get_person for one named person, and get_activity_log for admin history.
+You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown — and when names were requested, ACTUALLY LIST the people by name. If the data genuinely has no answer, say so plainly.`;
 }
 
 // Answer a free-text question by letting the model query the database via tools.
@@ -243,7 +248,10 @@ export async function runPlatformAssistant({ question, viewer }) {
       let result;
       try {
         const fn = TOOLS[call.function?.name];
-        const args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
+        // The model sometimes sends `null` or malformed args — always hand the
+        // tool a plain object.
+        let args = {};
+        try { args = JSON.parse(call.function?.arguments || '{}') || {}; } catch (_) { args = {}; }
         result = fn ? await fn(args, viewer) : { error: `unknown tool ${call.function?.name}` };
       } catch (err) {
         result = { error: err.message };
