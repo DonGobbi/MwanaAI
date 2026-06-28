@@ -453,15 +453,23 @@ const StatTile = ({ icon: Icon, value, label, sub, color }) => (
 
 // ---- Overview: a smart, at-a-glance command center ----
 const Overview = ({ school, isSuper, onGo }) => {
+  const [accounts, setAccounts] = useState([]);
   const [invites, setInvites] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [classrooms, setClassrooms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const all = await inviteService.listForSchool(school.id);
-        if (active) setInvites(all);
+        const [acc, inv, subj, rooms] = await Promise.all([
+          accountService.listBySchool(school.id),
+          inviteService.listForSchool(school.id),
+          subjectService.listForSchool(school.id),
+          classroomService.listForSchool(school.id),
+        ]);
+        if (active) { setAccounts(acc); setInvites(inv); setSubjects(subj); setClassrooms(rooms); }
       } catch (err) {
         /* ignore */
       } finally {
@@ -471,31 +479,40 @@ const Overview = ({ school, isSuper, onGo }) => {
     return () => { active = false; };
   }, [school.id]);
 
-  const students = invites.filter((i) => i.role === 'student');
-  const teachers = invites.filter((i) => i.role === 'teacher');
-  const admins = invites.filter((i) => i.role === 'admin');
-  const joined = (arr) => arr.filter((i) => i.status === 'accepted').length;
+  // Real, joined accounts by role (archived excluded); pending = invited, not joined.
+  const live = accounts.filter((u) => (u.status || 'active').toLowerCase() !== 'archived');
+  const countRole = (role) => live.filter((u) => (u.userType || '') === role).length;
+  const pending = (role) => invites.filter((i) => i.role === role && i.status !== 'accepted').length;
+  const studentCount = countRole('student');
+  const teacherCount = countRole('teacher');
+  const adminCount = countRole('admin');
+  const activeSubjects = subjects.filter((s) => (s.status || 'active') === 'active').length;
+  const activeRooms = classrooms.filter((c) => (c.status || 'active') === 'active').length;
+  const pendSub = (n) => (n > 0 ? `${n} pending invite${n !== 1 ? 's' : ''}` : 'none pending');
+  const v = (n) => (loading ? '…' : n);
 
+  const stepDesc = (count, pend, empty) =>
+    count || pend ? `${count} active · ${pend} pending` : empty;
   const steps = [
     { done: true, label: 'School created', desc: school.name },
     ...(isSuper
       ? [{
-          done: admins.length > 0,
+          done: adminCount > 0 || pending('admin') > 0,
           label: 'Add a school admin',
-          desc: admins.length ? `${admins.length} admin${admins.length !== 1 ? 's' : ''} · ${joined(admins)} joined` : 'Delegate teacher & student enrolment',
+          desc: stepDesc(adminCount, pending('admin'), 'Delegate teacher & student enrolment'),
           tab: 'admins',
         }]
       : []),
     {
-      done: teachers.length > 0,
+      done: teacherCount > 0 || pending('teacher') > 0,
       label: 'Invite teachers',
-      desc: teachers.length ? `${teachers.length} invited · ${joined(teachers)} joined` : 'Add the teachers who will run classes',
+      desc: stepDesc(teacherCount, pending('teacher'), 'Add the teachers who will run classes'),
       tab: 'teachers',
     },
     {
-      done: students.length > 0,
+      done: studentCount > 0 || pending('student') > 0,
       label: 'Enrol students',
-      desc: students.length ? `${students.length} invited · ${joined(students)} joined` : 'Add students to their class & subjects',
+      desc: stepDesc(studentCount, pending('student'), 'Add students to their class & subjects'),
       tab: 'students',
     },
   ];
@@ -509,20 +526,20 @@ const Overview = ({ school, isSuper, onGo }) => {
         <p className="text-primary-100 text-xs uppercase tracking-wide">School</p>
         <h2 className="text-2xl sm:text-3xl font-bold">{school.name}</h2>
         <p className="text-primary-50/90 text-sm mt-1">
-          {loading ? 'Loading…' : `${students.length} student${students.length !== 1 ? 's' : ''} · ${teachers.length} teacher${teachers.length !== 1 ? 's' : ''} invited`}
+          {loading ? 'Loading…' : `${studentCount} student${studentCount !== 1 ? 's' : ''} · ${teacherCount} teacher${teacherCount !== 1 ? 's' : ''}`}
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — real, joined accounts (not invites) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile icon={FiUsers} value={students.length} label="Students" sub={`${joined(students)} joined`} color="bg-sky-100 text-sky-600" />
-        <StatTile icon={FiUserCheck} value={teachers.length} label="Teachers" sub={`${joined(teachers)} joined`} color="bg-violet-100 text-violet-600" />
+        <StatTile icon={FiUsers} value={v(studentCount)} label="Students" sub={pendSub(pending('student'))} color="bg-sky-100 text-sky-600" />
+        <StatTile icon={FiUserCheck} value={v(teacherCount)} label="Teachers" sub={pendSub(pending('teacher'))} color="bg-violet-100 text-violet-600" />
         {isSuper ? (
-          <StatTile icon={FiShield} value={admins.length} label="School admins" sub={`${joined(admins)} joined`} color="bg-rose-100 text-rose-600" />
+          <StatTile icon={FiShield} value={v(adminCount)} label="School admins" sub={pendSub(pending('admin'))} color="bg-rose-100 text-rose-600" />
         ) : (
-          <StatTile icon={FiGrid} value={GRADE_LEVELS.length} label="Classes" sub="grades available" color="bg-amber-100 text-amber-600" />
+          <StatTile icon={FiGrid} value={v(activeRooms)} label="Classrooms" sub={activeRooms ? 'active' : 'add in Classrooms'} color="bg-amber-100 text-amber-600" />
         )}
-        <StatTile icon={FiBookOpen} value={SUBJECTS.length} label="Subjects" sub="offered" color="bg-emerald-100 text-emerald-600" />
+        <StatTile icon={FiBookOpen} value={v(activeSubjects)} label="Subjects" sub={activeSubjects ? 'active' : 'add in Subjects'} color="bg-emerald-100 text-emerald-600" />
       </div>
 
       {/* Setup checklist */}
