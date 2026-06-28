@@ -182,6 +182,18 @@ service cloud.firestore {
         || (isSchoolAdmin() && resource.data.get('schoolId', '') == myUser().get('schoolId', ''));
     }
 
+    // Classrooms (sections, e.g. Form 1 A) — per-school. Readable by any
+    // signed-in user; a Super Admin or the school's own School Admin can add and
+    // (de)activate. No delete — classrooms are deactivated, not removed.
+    match /classrooms/{id} {
+      allow read: if signedIn();
+      allow create: if request.resource.data.get('schoolId', '') != ''
+        && (isSuperadmin()
+            || (isSchoolAdmin() && request.resource.data.schoolId == myUser().get('schoolId', '')));
+      allow update: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.get('schoolId', '') == myUser().get('schoolId', ''));
+    }
+
     // Learning goals — private to the student who created them (query by userId).
     match /goals/{id} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;

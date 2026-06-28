@@ -7,6 +7,7 @@ import { emailService } from '../services/emailService';
 import { accountService } from '../services/accountService';
 import { auditService } from '../services/auditService';
 import { subjectService } from '../services/subjectService';
+import { classroomService } from '../services/classroomService';
 import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import { useSchoolSubjects } from '../hooks/useSchoolSubjects';
@@ -1220,6 +1221,176 @@ const SubjectsManager = ({ school, actor }) => {
   );
 };
 
+// ---- Classrooms: per-school sections (Form 1 A / B / C) ----
+const CLASSROOMS_PAGE_SIZE = 10;
+
+const ClassroomsManager = ({ school, actor }) => {
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [level, setLevel] = useState('');
+  const [section, setSection] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [statusBusyId, setStatusBusyId] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setRooms(await classroomService.listForSchool(school.id));
+    } catch (err) {
+      console.error('Could not load classrooms:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [school.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const denied = (err) => err?.code === 'permission-denied'
+    ? 'Permission denied — the latest security rules may not be published yet.'
+    : null;
+
+  const add = async (e) => {
+    e.preventDefault(); setMsg('');
+    if (!level) { setMsg('Pick a level.'); return; }
+    if (!section.trim()) { setMsg('Enter a section (e.g. A).'); return; }
+    const levelLabel = getGradeLevel(level)?.label || level;
+    if (rooms.some((r) => r.level === level && (r.section || '').toLowerCase() === section.trim().toLowerCase())) {
+      setMsg(`${levelLabel} ${section.trim()} already exists.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const created = await classroomService.add(school.id, actor, { level, levelLabel, section, capacity });
+      auditService.log({ schoolId: school.id, actor, action: 'Added classroom', targetType: 'classroom', targetId: created.id, targetName: created.name });
+      setSection(''); setCapacity(''); setMsg('Classroom added ✓');
+      load();
+    } catch (err) {
+      setMsg(denied(err) || err.message || 'Could not add the classroom.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = async (r) => {
+    const next = (r.status || 'active') === 'active' ? 'inactive' : 'active';
+    setStatusBusyId(r.id);
+    try {
+      await classroomService.setStatus(r.id, next);
+      setRooms((p) => p.map((x) => (x.id === r.id ? { ...x, status: next } : x)));
+      auditService.log({ schoolId: school.id, actor, action: next === 'active' ? 'Activated classroom' : 'Deactivated classroom', targetType: 'classroom', targetId: r.id, targetName: r.name });
+    } catch (err) {
+      console.error('classroom setStatus failed:', err);
+      setMsg(denied(err) || 'Could not update the classroom.');
+    } finally {
+      setStatusBusyId('');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? rooms.filter((r) => (r.name || '').toLowerCase().includes(q)) : rooms;
+  }, [rooms, search]);
+  useEffect(() => { setPage(0); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / CLASSROOMS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * CLASSROOMS_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + CLASSROOMS_PAGE_SIZE);
+
+  return (
+    <div className="space-y-5">
+      {/* Add a classroom */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-1"><FiGrid className="text-primary-600" /><h2 className="font-bold text-gray-900">Add a classroom</h2></div>
+        <p className="text-sm text-gray-500 mb-3">Split a busy level into sections — e.g. Form 1 <strong>A</strong>, <strong>B</strong>, <strong>C</strong>.</p>
+        <form onSubmit={add} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+          <select value={level} onChange={(e) => setLevel(e.target.value)}
+            className="sm:col-span-4 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+            <option value="">Level / Form</option>
+            <optgroup label="Primary">
+              {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+            </optgroup>
+            <optgroup label="Secondary">
+              {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+            </optgroup>
+          </select>
+          <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="Section (e.g. A)" maxLength={12}
+            className="sm:col-span-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Capacity (optional)" inputMode="numeric"
+            className="sm:col-span-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          <button type="submit" disabled={busy}
+            className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            {busy ? <Spinner className="w-4 h-4" /> : <><FiPlus /> Add</>}
+          </button>
+        </form>
+        {level && section.trim() && (
+          <p className="text-xs text-gray-400 mt-2">New classroom: <span className="font-medium text-gray-600">{getGradeLevel(level)?.label} {section.trim()}</span></p>
+        )}
+        {msg && <p className={`text-xs mt-2 ${msg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{msg}</p>}
+      </div>
+
+      {/* List */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-1"><FiGrid className="text-primary-600" /><h2 className="font-bold text-gray-900">Classrooms</h2></div>
+        <p className="text-sm text-gray-500 mb-3">This school's classrooms. Deactivate one to stop using it (it isn't deleted).</p>
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : rooms.length === 0 ? (
+          <p className="text-sm text-gray-400 py-2">No classrooms yet. Add one above (e.g. Form 1 A).</p>
+        ) : (
+          <>
+            {rooms.length > CLASSROOMS_PAGE_SIZE && (
+              <div className="relative mb-3 max-w-sm">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search classrooms"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+              </div>
+            )}
+            {filtered.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4">No classrooms match your search.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {pageItems.map((r) => {
+                  const activeRoom = (r.status || 'active') === 'active';
+                  return (
+                    <li key={r.id} className="flex items-center gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800 truncate">{r.name}</p>
+                        <p className="text-xs text-gray-400">{r.levelLabel || r.level}{r.capacity ? ` · capacity ${r.capacity}` : ''}</p>
+                      </div>
+                      <AccountStatusBadge status={activeRoom ? 'active' : 'inactive'} />
+                      <ActionMenu
+                        items={[
+                          activeRoom
+                            ? { label: 'Deactivate classroom', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => toggle(r) }
+                            : { label: 'Activate classroom', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => toggle(r) },
+                        ]}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {filtered.length > 0 && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + CLASSROOMS_PAGE_SIZE)} of {filtered.length}</p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page"
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                  <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page"
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ---- Manage one school: admins, teachers, students, parents ----
 const ManageSchool = ({ school, admin, isSuper, tab, onTab, onBack }) => {
   const [name, setName] = useState(school.name);
@@ -1262,6 +1433,7 @@ const ManageSchool = ({ school, admin, isSuper, tab, onTab, onBack }) => {
     { id: 'students', label: 'Students', icon: FiUsers },
     { id: 'parents', label: 'Parents', icon: FiUsers },
     { id: 'subjects', label: 'Subjects', icon: FiBookOpen },
+    { id: 'classrooms', label: 'Classrooms', icon: FiGrid },
     { id: 'history', label: 'History', icon: FiClock },
     ...(isSuper ? [{ id: 'settings', label: 'Settings', icon: FiSettings }] : []),
   ];
@@ -1335,6 +1507,8 @@ const ManageSchool = ({ school, admin, isSuper, tab, onTab, onBack }) => {
         )}
 
         {activeTab === 'subjects' && <SubjectsManager school={school} actor={admin} />}
+
+        {activeTab === 'classrooms' && <ClassroomsManager school={school} actor={admin} />}
 
         {activeTab === 'history' && <AuditLog school={school} />}
 
