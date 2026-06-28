@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { FiUser, FiShield, FiFileText, FiLock, FiLogOut, FiArrowLeft, FiCamera } from 'react-icons/fi';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
@@ -102,8 +103,8 @@ const StatusBadge = ({ status }) => {
 const Profile = () => {
   const navigate = useNavigate();
   const { tab } = useParams();
-  // The URL drives which tab is shown: /profile (info) or /profile/account.
-  const activeTab = tab === 'account' ? 'account' : 'profile';
+  // The URL drives which tab is shown: /profile (info) or /profile/security.
+  const activeTab = tab === 'security' ? 'security' : 'profile';
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -136,7 +137,7 @@ const Profile = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState('');
 
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
 
   // User data state (editable personal info)
   const [userData, setUserData] = useState({
@@ -375,110 +376,83 @@ const Profile = () => {
 
   const age = calculateAge(isEditing ? formData.dateOfBirth : userData.dateOfBirth);
   const initials = (userData.name || 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+  const navItem = (active) =>
+    `w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium rounded-lg transition-colors ${
+      active ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+    }`;
+  const doLogout = async () => {
+    try { await logout(); navigate('/'); } catch (e) { /* ignore */ }
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* Hero Section matching About/Resources page style */}
-      <div className="bg-primary-700 text-white py-16 md:py-24">
-        <div className="container">
-          <div className="text-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              My Profile
-            </h1>
-            <p className="text-white text-lg mx-auto font-medium max-w-2xl mb-6">
-              Manage your account settings and preferences
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
+          {/* Settings nav */}
           <div className="lg:col-span-1">
             <Card className="sticky top-24">
-              <div className="p-6 text-center">
-                <div className="relative inline-block">
-                  {userData.profileImage ? (
-                    <img
-                      src={userData.profileImage}
-                      alt={userData.name || 'Profile'}
-                      className="w-32 h-32 rounded-full mx-auto border-4 border-white shadow object-cover bg-gray-100"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full mx-auto border-4 border-white shadow bg-primary-600 text-white flex items-center justify-center text-3xl font-bold select-none">
-                      {initials}
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                  <button
-                    type="button"
-                    className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full shadow-md hover:bg-primary-700 disabled:opacity-60"
-                    onClick={handlePickPhoto}
-                    disabled={uploadingPhoto}
-                    title="Change photo"
-                  >
-                    {uploadingPhoto ? (
-                      <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
+              <div className="p-4">
+                <button onClick={() => navigate('/')} className="text-sm text-gray-500 hover:text-gray-800 inline-flex items-center gap-1.5 mb-4">
+                  <FiArrowLeft className="w-4 h-4" /> Back to Dashboard
+                </button>
+                <h2 className="text-lg font-bold text-gray-900">Settings</h2>
+                <p className="text-xs text-gray-400 truncate">
+                  {userData.email}{accountMeta.role ? ` · ${ROLE_LABELS[accountMeta.role] || accountMeta.role}` : ''}
+                </p>
+
+                {/* Avatar + photo */}
+                <div className="flex items-center gap-3 mt-4">
+                  <div className="relative flex-shrink-0">
+                    {userData.profileImage ? (
+                      <img src={userData.profileImage} alt={userData.name || 'Profile'} className="w-14 h-14 rounded-full object-cover bg-gray-100" />
                     ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                      <div className="w-14 h-14 rounded-full bg-primary-600 text-white flex items-center justify-center text-lg font-bold select-none">{initials}</div>
                     )}
-                  </button>
-                </div>
-                <h2 className="text-xl font-bold mt-4">{userData.name || 'User'}</h2>
-                <p className="text-gray-600 text-sm">{userData.email}</p>
-                <div className="mt-2 flex items-center justify-center gap-2">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">
-                    {ROLE_LABELS[accountMeta.role] || accountMeta.role}
-                  </span>
-                  <StatusBadge status={accountMeta.status} />
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                    <button type="button" onClick={handlePickPhoto} disabled={uploadingPhoto} title="Change photo"
+                      className="absolute -bottom-1 -right-1 bg-primary-600 text-white p-1.5 rounded-full shadow hover:bg-primary-700 disabled:opacity-60">
+                      {uploadingPhoto ? (
+                        <svg className="animate-spin w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      ) : (
+                        <FiCamera className="w-3 h-3" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{userData.name || 'User'}</p>
+                    <StatusBadge status={accountMeta.status} />
+                  </div>
                 </div>
                 {photoError && <p className="mt-2 text-xs text-red-600">{photoError}</p>}
               </div>
 
-              <div className="border-t border-gray-200">
-                <nav className="flex flex-col">
-                  <button
-                    onClick={() => navigate('/profile')}
-                    className={`flex items-center px-6 py-3 text-sm font-medium ${
-                      activeTab === 'profile'
-                        ? 'bg-primary-50 text-primary-600 border-l-4 border-primary-600'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Profile Information
+              <div className="border-t border-gray-100 p-3 space-y-4">
+                <div>
+                  <p className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Account</p>
+                  <div className="space-y-1">
+                    <button onClick={() => navigate('/profile')} className={navItem(activeTab === 'profile')}>
+                      <FiUser className="w-4 h-4 flex-shrink-0" /> Profile
+                    </button>
+                    <button onClick={() => navigate('/profile/security')} className={navItem(activeTab === 'security')}>
+                      <FiShield className="w-4 h-4 flex-shrink-0" /> Security
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Resources</p>
+                  <div className="space-y-1">
+                    <Link to="/terms" className={navItem(false)}><FiFileText className="w-4 h-4 flex-shrink-0" /> Terms of Use</Link>
+                    <Link to="/privacy" className={navItem(false)}><FiLock className="w-4 h-4 flex-shrink-0" /> Privacy Policy</Link>
+                  </div>
+                </div>
+                <div className="border-t border-gray-100 pt-2">
+                  <button onClick={doLogout} className="w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <FiLogOut className="w-4 h-4 flex-shrink-0" /> Logout
                   </button>
-
-                  <button
-                    onClick={() => navigate('/profile/account')}
-                    className={`flex items-center px-6 py-3 text-sm font-medium ${
-                      activeTab === 'account'
-                        ? 'bg-primary-50 text-primary-600 border-l-4 border-primary-600'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Account Settings
-                  </button>
-                </nav>
+                </div>
               </div>
             </Card>
           </div>
@@ -722,10 +696,10 @@ const Profile = () => {
               </div>
             )}
 
-            {activeTab === 'account' && (
+            {activeTab === 'security' && (
               <Card>
                 <Card.Header>
-                  <h2 className="text-xl font-bold">Account Settings</h2>
+                  <h2 className="text-xl font-bold">Security</h2>
                 </Card.Header>
                 <Card.Body>
                   <div className="space-y-6">

@@ -19,6 +19,8 @@ import MyCourses from './pages/MyCourses';
 import CourseSetup from './pages/CourseSetup';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import { PageLoader } from './components/Spinner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -47,6 +49,8 @@ const RoutesTree = ({ location }) => (
     <Route path="/" element={<Home />} />
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<Signup />} />
+    <Route path="/terms" element={<Terms />} />
+    <Route path="/privacy" element={<Privacy />} />
     <Route path="/tutor" element={<ProtectedRoute><AITutor /></ProtectedRoute>} />
     <Route path="/courses" element={<ProtectedRoute><MyCourses /></ProtectedRoute>} />
     <Route path="/learn" element={<ProtectedRoute><Learn /></ProtectedRoute>} />
