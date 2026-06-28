@@ -151,16 +151,18 @@ const firebaseService = {
     return auth.currentUser;
   },
 
-  // Register a new user
+  // Register a new user. Normalise the email to lowercase so it matches
+  // lowercase invite records (the security rules look up invites by email).
   register: async (email, password, displayName) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+      const clean = (email || '').trim().toLowerCase();
+      const userCredential = await createUserWithEmailAndPassword(auth, clean, password);
+
       // Update profile with display name
       if (displayName) {
         await updateProfile(userCredential.user, { displayName });
       }
-      
+
       return userCredential.user;
     } catch (error) {
       throw handleFirebaseError(error);
@@ -170,7 +172,8 @@ const firebaseService = {
   // Sign in existing user
   login: async (email, password) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const clean = (email || '').trim().toLowerCase();
+      const userCredential = await signInWithEmailAndPassword(auth, clean, password);
       return userCredential.user;
     } catch (error) {
       throw handleFirebaseError(error);

@@ -31,11 +31,36 @@ service cloud.firestore {
       return signedIn() && myUser().userType == 'admin';
     }
 
-    // User profiles — readable by signed-in users (rosters, parent lookup);
-    // writable only by the owner.
+    // The role a write is trying to set ('' if the write doesn't set one).
+    function newRole() {
+      return request.resource.data.get('userType', '');
+    }
+
+    // True if an invite addressed to THIS user's email (at the school named in
+    // the write) grants `role`. This is how an invited admin self-configures.
+    function invitedAs(role) {
+      return request.resource.data.get('schoolId', '') != ''
+        && exists(/databases/$(database)/documents/invites/$(request.resource.data.schoolId + '_' + request.auth.token.email))
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.schoolId + '_' + request.auth.token.email)).data.role == role;
+    }
+
+    // A user may set only non-privileged roles on themselves (the public
+    // sign-up form). 'admin' requires a matching invite. 'superadmin' can NEVER
+    // be set from the client — it is assigned out-of-band (console / backend).
+    function roleAllowed() {
+      return newRole() == '' || newRole() == 'student' || newRole() == 'teacher' || newRole() == 'parent'
+        || (newRole() == 'admin' && invitedAs('admin'));
+    }
+
+    // User profiles — readable by signed-in users (rosters, parent lookup).
+    // A user manages their OWN profile but cannot grant themselves a privileged
+    // role (see roleAllowed). Role only needs validating when it changes.
     match /users/{uid} {
       allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid && roleAllowed();
+      allow update: if signedIn() && request.auth.uid == uid
+        && (request.resource.data.get('userType', '') == resource.data.get('userType', '') || roleAllowed());
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
 
     // Saved tutor conversations — private to the owner.
@@ -98,10 +123,9 @@ service cloud.firestore {
       allow read: if isSuperadmin()
         || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId)
         || (signedIn() && resource.data.email == request.auth.token.email);
-      allow create: if isSuperadmin()
-        || (isSchoolAdmin()
-            && request.resource.data.schoolId == myUser().schoolId
-            && request.resource.data.role in ['admin', 'teacher', 'student', 'parent']);
+      allow create: if request.resource.data.role in ['admin', 'teacher', 'student', 'parent']
+        && (isSuperadmin()
+            || (isSchoolAdmin() && request.resource.data.schoolId == myUser().schoolId));
       allow delete: if isSuperadmin()
         || (isSchoolAdmin() && resource.data.schoolId == myUser().schoolId);
       allow update: if isSuperadmin()
