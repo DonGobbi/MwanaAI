@@ -5,6 +5,8 @@ import { auditService } from './auditService';
 import { classroomService } from './classroomService';
 import { subjectService } from './subjectService';
 import { quizService } from './quizService';
+import { inviteService } from './inviteService';
+import { emailService } from './emailService';
 
 // An agentic assistant: instead of a fixed snapshot, the model is given TOOLS
 // that read live data from the database and decides which to call to answer a
@@ -32,6 +34,21 @@ async function auditForViewer(viewer, max = 200) {
   return viewer.role === 'admin'
     ? auditService.listForSchool(viewer.schoolId, max)
     : auditService.listRecent(max);
+}
+const onlySuper = (viewer) => viewer.role === 'superadmin';
+async function findSchool(name, viewer) {
+  const schools = await schoolsForViewer(viewer);
+  const q = (name || '').trim().toLowerCase();
+  return schools.find((s) => s.name.toLowerCase() === q) || schools.find((s) => s.name.toLowerCase().includes(q));
+}
+async function findPerson(nameOrEmail, viewer) {
+  const people = await peopleForViewer(viewer);
+  const q = (nameOrEmail || '').trim().toLowerCase();
+  return (
+    people.find((p) => (p.email || '').toLowerCase() === q) ||
+    people.find((p) => (p.displayName || '').toLowerCase() === q) ||
+    people.find((p) => (p.displayName || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+  );
 }
 
 // ---- tool executors ----
@@ -161,7 +178,90 @@ const TOOLS = {
     const [s, schools] = await Promise.all([accountService.platformStats(), schoolService.listSchools()]);
     return { scope: 'whole platform', students: s.student, teachers: s.teacher, schoolAdmins: s.admin, parents: s.parent, deactivated: s.deactivated, totalAccounts: s.total, schools: schools.length };
   },
+
+  // ---- ACTION tools: they only PREPARE an action (resolve the target + impact)
+  // and return a proposal. Nothing changes until the user confirms. ----
+  async suspend_school(args, viewer) {
+    if (!onlySuper(viewer)) return { error: 'Only a super administrator can suspend a school.' };
+    const s = await findSchool(args.school, viewer);
+    if (!s) return { error: `No school matching "${args.school}".` };
+    if ((s.status || 'active').toLowerCase() !== 'active') return { error: `${s.name} is already ${s.status}.` };
+    const stats = await accountService.platformStats().catch(() => null);
+    const c = stats?.bySchool?.[s.id];
+    return { proposal: { type: 'suspend_school', schoolId: s.id, schoolName: s.name, summary: `Suspend ${s.name}`, impact: c ? `${c.total} member(s) (incl. ${c.student || 0} students) will be blocked from signing in` : 'its members will be blocked from signing in', confirmLabel: 'Suspend school', danger: true } };
+  },
+  async reactivate_school(args, viewer) {
+    if (!onlySuper(viewer)) return { error: 'Only a super administrator can reactivate a school.' };
+    const s = await findSchool(args.school, viewer);
+    if (!s) return { error: `No school matching "${args.school}".` };
+    if ((s.status || 'active').toLowerCase() === 'active') return { error: `${s.name} is already active.` };
+    return { proposal: { type: 'reactivate_school', schoolId: s.id, schoolName: s.name, summary: `Reactivate ${s.name}`, impact: 'its members will be able to sign in again', confirmLabel: 'Reactivate school' } };
+  },
+  async deactivate_account(args, viewer) {
+    const u = await findPerson(args.name_or_email, viewer);
+    if (!u) return { error: `No account matching "${args.name_or_email}".` };
+    if (u.userType === 'superadmin') return { error: 'A super administrator account cannot be deactivated here.' };
+    if ((u.status || 'active').toLowerCase() === 'deactivated') return { error: `${u.displayName || u.email} is already deactivated.` };
+    return { proposal: { type: 'deactivate_account', uid: u.uid, name: u.displayName || u.email, summary: `Deactivate ${u.displayName || u.email}`, impact: 'they will be blocked from signing in (their data is kept)', confirmLabel: 'Deactivate account', danger: true } };
+  },
+  async reactivate_account(args, viewer) {
+    const u = await findPerson(args.name_or_email, viewer);
+    if (!u) return { error: `No account matching "${args.name_or_email}".` };
+    if ((u.status || 'active').toLowerCase() !== 'deactivated') return { error: `${u.displayName || u.email} is not deactivated.` };
+    return { proposal: { type: 'reactivate_account', uid: u.uid, name: u.displayName || u.email, summary: `Reactivate ${u.displayName || u.email}`, confirmLabel: 'Reactivate account' } };
+  },
+  async invite_user(args, viewer) {
+    const role = (args.role || '').toLowerCase();
+    if (!['admin', 'teacher', 'student', 'parent'].includes(role)) return { error: 'Role must be admin, teacher, student or parent.' };
+    if (!args.email || !args.email.includes('@')) return { error: 'A valid email address is required to invite someone.' };
+    const s = await findSchool(args.school, viewer);
+    if (!s) return { error: `No school matching "${args.school}". Which school should they join?` };
+    return { proposal: { type: 'invite_user', schoolId: s.id, schoolName: s.name, email: args.email.trim().toLowerCase(), role, summary: `Invite ${args.email.trim().toLowerCase()} as a ${role} to ${s.name}`, impact: 'an invitation email will be sent to them', confirmLabel: 'Send invite' } };
+  },
+  async add_subject(args, viewer) {
+    if (!args.subject) return { error: 'Which subject should I add?' };
+    const s = await findSchool(args.school, viewer);
+    if (!s) return { error: `No school matching "${args.school}".` };
+    return { proposal: { type: 'add_subject', schoolId: s.id, schoolName: s.name, subjectName: args.subject.trim(), summary: `Add the subject "${args.subject.trim()}" to ${s.name}`, confirmLabel: 'Add subject' } };
+  },
 };
+
+// Run a confirmed action (called by the UI AFTER the user clicks Confirm).
+export async function executeAction(action, viewer) {
+  const actor = { uid: viewer.uid, displayName: viewer.name, email: viewer.email };
+  const log = (entry) => auditService.log({ actor, ...entry });
+  switch (action.type) {
+    case 'suspend_school':
+      await schoolService.setStatus(action.schoolId, 'suspended');
+      log({ schoolId: action.schoolId, action: 'Suspended school', targetType: 'school', targetId: action.schoolId, targetName: action.schoolName });
+      return `Done — ${action.schoolName} is now suspended.`;
+    case 'reactivate_school':
+      await schoolService.setStatus(action.schoolId, 'active');
+      log({ schoolId: action.schoolId, action: 'Restored school', targetType: 'school', targetId: action.schoolId, targetName: action.schoolName });
+      return `Done — ${action.schoolName} is active again.`;
+    case 'deactivate_account':
+      await accountService.setStatus(action.uid, 'deactivated', viewer.uid);
+      log({ action: 'Deactivated account', targetType: 'user', targetId: action.uid, targetName: action.name });
+      return `Done — ${action.name}'s account is deactivated.`;
+    case 'reactivate_account':
+      await accountService.setStatus(action.uid, 'active', viewer.uid);
+      log({ action: 'Reactivated account', targetType: 'user', targetId: action.uid, targetName: action.name });
+      return `Done — ${action.name}'s account is active again.`;
+    case 'invite_user': {
+      const school = { id: action.schoolId, name: action.schoolName };
+      await inviteService.create(actor, school, { email: action.email, role: action.role });
+      try { await emailService.sendInvite({ email: action.email, role: action.role, schoolName: action.schoolName }); } catch (_) { /* email best-effort */ }
+      log({ schoolId: action.schoolId, action: `Invited ${action.role}`, targetType: action.role, targetName: action.email });
+      return `Done — invited ${action.email} as a ${action.role} to ${action.schoolName}.`;
+    }
+    case 'add_subject':
+      await subjectService.add(action.schoolId, actor, { name: action.subjectName });
+      log({ schoolId: action.schoolId, action: 'Added subject', targetType: 'subject', targetName: action.subjectName });
+      return `Done — added "${action.subjectName}" to ${action.schoolName}.`;
+    default:
+      throw new Error('Unknown action.');
+  }
+}
 
 const TOOL_DEFS = [
   {
@@ -212,6 +312,31 @@ const TOOL_DEFS = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // Action tools — these only PREPARE the action; the user must confirm.
+  {
+    type: 'function',
+    function: { name: 'suspend_school', description: 'Prepare to suspend (block sign-in for) a whole school. Does NOT take effect until the user confirms.', parameters: { type: 'object', properties: { school: { type: 'string', description: 'school name' } }, required: ['school'] } },
+  },
+  {
+    type: 'function',
+    function: { name: 'reactivate_school', description: 'Prepare to reactivate a suspended school. Requires user confirmation.', parameters: { type: 'object', properties: { school: { type: 'string' } }, required: ['school'] } },
+  },
+  {
+    type: 'function',
+    function: { name: 'deactivate_account', description: "Prepare to deactivate one person's account (blocks their sign-in; data kept). Requires user confirmation.", parameters: { type: 'object', properties: { name_or_email: { type: 'string' } }, required: ['name_or_email'] } },
+  },
+  {
+    type: 'function',
+    function: { name: 'reactivate_account', description: 'Prepare to reactivate a deactivated account. Requires user confirmation.', parameters: { type: 'object', properties: { name_or_email: { type: 'string' } }, required: ['name_or_email'] } },
+  },
+  {
+    type: 'function',
+    function: { name: 'invite_user', description: 'Prepare to invite a new person (sends an invitation email on confirm). Requires user confirmation.', parameters: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string', description: 'admin, teacher, student or parent' }, school: { type: 'string' } }, required: ['email', 'role', 'school'] } },
+  },
+  {
+    type: 'function',
+    function: { name: 'add_subject', description: 'Prepare to add a subject to a school. Requires user confirmation.', parameters: { type: 'object', properties: { subject: { type: 'string' }, school: { type: 'string' } }, required: ['subject', 'school'] } },
+  },
 ];
 
 function systemPrompt(viewer) {
@@ -226,7 +351,9 @@ How to choose tools:
 - If the request mentions NAMES, a LIST of people, emails, or "everyone"/"everything", you MUST call find_people to fetch the actual people. Counts from get_stats are NOT enough — get_stats has no names.
 - For a "full summary of everything", call find_people (the people, with names), get_schools (schools, classrooms, subjects) AND get_stats (totals) before answering, then list the actual names.
 - Use get_person for one named person, and get_activity_log for admin history.
-You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown — and when names were requested, ACTUALLY LIST the people by name. If the data genuinely has no answer, say so plainly.`;
+You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown — and when names were requested, ACTUALLY LIST the people by name. If the data genuinely has no answer, say so plainly.
+
+You can also PREPARE actions: suspend_school, reactivate_school, deactivate_account, reactivate_account, invite_user, add_subject. CRITICAL: these tools only PREPARE the action and compute its impact — NOTHING is changed until the user clicks Confirm. After calling an action tool, clearly state exactly what will happen (including any impact) and tell the user to confirm. NEVER say an action is already done. If an action tool returns an error (target not found, already in that state, missing detail), explain it and ask for what's needed.`;
 }
 
 // Answer a free-text question by letting the model query the database via tools.
@@ -235,13 +362,14 @@ export async function runPlatformAssistant({ question, viewer }) {
     { role: 'system', content: systemPrompt(viewer) },
     { role: 'user', content: question },
   ];
+  let pendingAction = null; // an action awaiting the user's confirmation
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const msg = await groqTools(messages, TOOL_DEFS, { maxTokens: 1200 });
     messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
 
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
-      return msg.content || 'I could not find an answer to that.';
+      return { answer: msg.content || 'I could not find an answer to that.', pendingAction };
     }
 
     for (const call of msg.tool_calls) {
@@ -256,6 +384,7 @@ export async function runPlatformAssistant({ question, viewer }) {
       } catch (err) {
         result = { error: err.message };
       }
+      if (result && result.proposal) pendingAction = result.proposal; // capture the latest proposed action
       messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result).slice(0, 6000) });
     }
   }
@@ -266,5 +395,5 @@ export async function runPlatformAssistant({ question, viewer }) {
     [],
     { maxTokens: 1000 }
   );
-  return finalMsg.content || 'I gathered some data but could not compose a final answer.';
+  return { answer: finalMsg.content || 'I gathered some data but could not compose a final answer.', pendingAction };
 }

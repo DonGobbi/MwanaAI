@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FiZap, FiRefreshCw, FiSend } from 'react-icons/fi';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { FiZap, FiRefreshCw, FiSend, FiCheck, FiX, FiAlertTriangle } from 'react-icons/fi';
 import Card from './Card';
 import Markdown from './Markdown';
 import { useAuth } from '../contexts/AuthContext';
 import { aiInsights } from '../services/aiInsightsService';
-import { runPlatformAssistant } from '../services/assistantAgent';
+import { runPlatformAssistant, executeAction } from '../services/assistantAgent';
 import { accountService } from '../services/accountService';
 import { schoolService } from '../services/schoolService';
 import { auditService } from '../services/auditService';
@@ -111,6 +111,18 @@ const PlatformInsights = () => {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [asking, setAsking] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // action awaiting confirm
+  const [executing, setExecuting] = useState(false);
+  const [actionResult, setActionResult] = useState(null); // { ok, text } after running
+
+  const viewer = useMemo(() => ({
+    role: userProfile?.userType || 'superadmin',
+    schoolId: userProfile?.schoolId || '',
+    schoolName: userProfile?.schoolName || '',
+    name: currentUser?.displayName || userProfile?.displayName || currentUser?.email || 'the administrator',
+    email: currentUser?.email || '',
+    uid: currentUser?.uid || '',
+  }), [currentUser, userProfile]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,24 +165,36 @@ const PlatformInsights = () => {
     setAsking(true);
     setAnswer('');
     setError('');
+    setPendingAction(null);
+    setActionResult(null);
     try {
       // The agent queries the database on demand via tools, scoped to who's
-      // asking — so it can answer anything the viewer is allowed to see.
-      const viewer = {
-        role: userProfile?.userType || 'superadmin',
-        schoolId: userProfile?.schoolId || '',
-        schoolName: userProfile?.schoolName || '',
-        name: currentUser?.displayName || userProfile?.displayName || currentUser?.email || 'the administrator',
-        email: currentUser?.email || '',
-        uid: currentUser?.uid || '',
-      };
-      const text = await runPlatformAssistant({ question: query, viewer });
+      // asking. Action requests come back as a pendingAction to confirm.
+      const { answer: text, pendingAction: pa } = await runPlatformAssistant({ question: query, viewer });
       setAnswer(text);
+      setPendingAction(pa || null);
     } catch (err) {
       console.error('Platform ask failed:', err);
       setError(err.message || 'Could not answer that right now.');
     } finally {
       setAsking(false);
+    }
+  };
+
+  const confirmAction = async () => {
+    if (!pendingAction || executing) return;
+    setExecuting(true);
+    setError('');
+    try {
+      const msg = await executeAction(pendingAction, viewer);
+      setActionResult({ ok: true, text: msg });
+      setPendingAction(null);
+      load(); // refresh the briefing now the platform changed
+    } catch (err) {
+      console.error('Action failed:', err);
+      setActionResult({ ok: false, text: err?.code === 'permission-denied' ? 'Permission denied — the latest security rules may not be published yet.' : (err.message || 'Could not complete that action.') });
+    } finally {
+      setExecuting(false);
     }
   };
 
@@ -253,6 +277,39 @@ const PlatformInsights = () => {
           <div className="mt-3 bg-gray-50 rounded-lg p-3">
             <Markdown content={answer} />
           </div>
+        )}
+
+        {/* Confirm-before-acting card */}
+        {pendingAction && !asking && (
+          <div className={`mt-3 rounded-lg p-3 border ${pendingAction.danger ? 'border-red-200 bg-red-50' : 'border-primary-200 bg-primary-50'}`}>
+            <div className="flex items-start gap-2">
+              <FiAlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${pendingAction.danger ? 'text-red-500' : 'text-primary-600'}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900">{pendingAction.summary}</p>
+                {pendingAction.impact && <p className="text-xs text-gray-600 mt-0.5">{pendingAction.impact}.</p>}
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={confirmAction}
+                    disabled={executing}
+                    className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-60 ${pendingAction.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'}`}
+                  >
+                    <FiCheck className="w-4 h-4" /> {executing ? 'Working…' : (pendingAction.confirmLabel || 'Confirm')}
+                  </button>
+                  <button
+                    onClick={() => { setPendingAction(null); setActionResult({ ok: true, text: 'Cancelled — nothing was changed.' }); }}
+                    disabled={executing}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+                  >
+                    <FiX className="w-4 h-4" /> Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {actionResult && (
+          <p className={`text-sm mt-2 ${actionResult.ok ? 'text-green-700' : 'text-red-600'}`}>{actionResult.text}</p>
         )}
         {error && briefing && <p className="text-sm text-red-600 mt-2">{error}</p>}
       </div>
