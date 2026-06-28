@@ -10,10 +10,11 @@ import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import { calculateAge } from '../utils/age';
 import Spinner, { PageLoader } from '../components/Spinner';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ActionMenu from '../components/ActionMenu';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
-  FiSearch, FiChevronLeft, FiChevronRight,
+  FiSearch, FiChevronLeft, FiChevronRight, FiEye,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -293,25 +294,15 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
                     <p className="text-xs text-gray-400 truncate">{u.email}</p>
                   </div>
                   <AccountStatusBadge status={status} />
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <button onClick={() => setOpenId(open ? '' : u.uid)}
-                      className="text-xs text-gray-500 hover:text-gray-800">{open ? 'Hide' : 'Details'}</button>
-                    <button onClick={() => sendReset(u)} title="Email a password reset link"
-                      className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1">
-                      <FiKey className="w-3.5 h-3.5" /><span className="hidden sm:inline">Reset password</span>
-                    </button>
-                    {canDeactivate && (deactivated ? (
-                      <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'active' })}
-                        className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                        <FiRefreshCw className="w-3.5 h-3.5" /><span className="hidden sm:inline">Reactivate</span>
-                      </button>
-                    ) : (
-                      <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'deactivated' })}
-                        className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                        <FiSlash className="w-3.5 h-3.5" /><span className="hidden sm:inline">Deactivate</span>
-                      </button>
-                    ))}
-                  </div>
+                  <ActionMenu
+                    items={[
+                      { label: open ? 'Hide details' : 'View details', icon: <FiEye className="w-4 h-4" />, onClick: () => setOpenId(open ? '' : u.uid) },
+                      { label: 'Send password reset', icon: <FiKey className="w-4 h-4" />, onClick: () => sendReset(u) },
+                      canDeactivate && (deactivated
+                        ? { label: 'Reactivate account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, status: 'active' }) }
+                        : { label: 'Deactivate account', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmAction({ user: u, status: 'deactivated' }) }),
+                    ]}
+                  />
                 </div>
                 {note[u.uid] && <p className={`text-xs mt-1 ml-12 ${note[u.uid].includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{note[u.uid]}</p>}
                 {open && (
@@ -813,21 +804,17 @@ const SchoolsList = ({ admin, onOpen }) => {
                             <p className="text-xs text-gray-400 mt-1">Registered {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'}</p>
                           </div>
                         </button>
-                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <button onClick={() => onOpen(s)} className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 font-medium">
                             Manage <FiArrowRight className="w-3.5 h-3.5" />
                           </button>
-                          {suspended ? (
-                            <button disabled={busyId === s.id} onClick={() => setConfirmSchool({ school: s, status: 'active' })}
-                              className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                              <FiRefreshCw className="w-3.5 h-3.5" /> Restore
-                            </button>
-                          ) : (
-                            <button disabled={busyId === s.id} onClick={() => setConfirmSchool({ school: s, status: 'suspended' })}
-                              className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                              <FiSlash className="w-3.5 h-3.5" /> Suspend
-                            </button>
-                          )}
+                          <ActionMenu
+                            items={[
+                              suspended
+                                ? { label: 'Restore access', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmSchool({ school: s, status: 'active' }) }
+                                : { label: 'Suspend school', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmSchool({ school: s, status: 'suspended' }) },
+                            ]}
+                          />
                         </div>
                       </div>
                     );
