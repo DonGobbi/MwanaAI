@@ -1,13 +1,12 @@
-// Compute a whole-number age from a date of birth. The age shown on profiles
-// is always derived from the DOB (never stored) so it can't drift out of date.
+// Age derived from the date of birth (never stored, so it can't drift). By
+// design this is the year-only difference (current year − birth year), i.e. the
+// age the person turns this year — not adjusted for whether the birthday has
+// passed yet.
 export function calculateAge(dob) {
   if (!dob) return null;
   const birth = new Date(dob);
   if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
+  const age = new Date().getFullYear() - birth.getFullYear();
   if (age < 0 || age > 120) return null;
   return age;
 }
