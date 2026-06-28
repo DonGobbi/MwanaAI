@@ -4,6 +4,7 @@ import Card from './Card';
 import Markdown from './Markdown';
 import { useAuth } from '../contexts/AuthContext';
 import { aiInsights } from '../services/aiInsightsService';
+import { runPlatformAssistant } from '../services/assistantAgent';
 import { accountService } from '../services/accountService';
 import { schoolService } from '../services/schoolService';
 import { auditService } from '../services/auditService';
@@ -147,13 +148,23 @@ const PlatformInsights = () => {
 
   const ask = async (q) => {
     const query = (q ?? question).trim();
-    if (!query || asking || !snapshot) return;
+    if (!query || asking) return;
     setQuestion(query);
     setAsking(true);
     setAnswer('');
     setError('');
     try {
-      const text = await aiInsights.platformAsk({ question: query, snapshot });
+      // The agent queries the database on demand via tools, scoped to who's
+      // asking — so it can answer anything the viewer is allowed to see.
+      const viewer = {
+        role: userProfile?.userType || 'superadmin',
+        schoolId: userProfile?.schoolId || '',
+        schoolName: userProfile?.schoolName || '',
+        name: currentUser?.displayName || userProfile?.displayName || currentUser?.email || 'the administrator',
+        email: currentUser?.email || '',
+        uid: currentUser?.uid || '',
+      };
+      const text = await runPlatformAssistant({ question: query, viewer });
       setAnswer(text);
     } catch (err) {
       console.error('Platform ask failed:', err);

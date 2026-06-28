@@ -39,3 +39,41 @@ export async function groqChat(messages, { json = false, maxTokens = 1600, tempe
       : 'Something went wrong. Please try again.'
   );
 }
+
+// Tool-calling variant: returns the raw assistant message (which may contain
+// `tool_calls`). Used by the agentic assistant so the model can query the
+// database on demand. Same model fallback as groqChat.
+export async function groqTools(messages, tools, { maxTokens = 1200, temperature = 0.3 } = {}) {
+  if (!API_KEY) throw new Error('No AI key is configured.');
+  let lastError = '';
+  for (const model of MODELS) {
+    try {
+      const body = { model, messages, temperature, max_tokens: maxTokens };
+      if (tools && tools.length) {
+        body.tools = tools;
+        body.tool_choice = 'auto';
+      }
+      const res = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const msg = data.choices?.[0]?.message;
+        if (msg) return msg;
+      } else {
+        lastError = `${model}: HTTP ${res.status}`;
+        console.warn('[groq tools]', lastError);
+      }
+    } catch (err) {
+      lastError = `${model}: ${err.message}`;
+      console.warn('[groq tools]', lastError);
+    }
+  }
+  throw new Error(
+    lastError.includes('429')
+      ? 'The AI is busy right now. Please wait a few seconds and try again.'
+      : 'Something went wrong. Please try again.'
+  );
+}
