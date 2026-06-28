@@ -626,7 +626,7 @@ const AdminHome = ({ firstName, role }) => {
           const accts = await accountService.listBySchool(userProfile.schoolId);
           const c = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 };
           accts.forEach((u) => {
-            if ((u.status || 'active').toLowerCase() === 'archived') return;
+            if (['archived', 'deleted'].includes((u.status || 'active').toLowerCase())) return;
             if (c[u.userType] != null) { c[u.userType] += 1; c.total += 1; }
           });
           if (active) setCounts(c);

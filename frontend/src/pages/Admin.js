@@ -18,7 +18,7 @@ import ActionMenu from '../components/ActionMenu';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
-  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiArchive, FiActivity,
+  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiArchive, FiActivity, FiTrash2,
 } from 'react-icons/fi';
 
 const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'Admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
@@ -198,6 +198,7 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
   const [openId, setOpenId] = useState('');
   const [note, setNote] = useState({}); // uid -> transient message
   const [confirmAction, setConfirmAction] = useState(null); // { user, status } pending confirmation
+  const [confirmPurge, setConfirmPurge] = useState(null); // archived user pending permanent delete
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all | active | deactivated
   const [page, setPage] = useState(0);
@@ -252,10 +253,30 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
     }
   };
 
+  const purgeUser = async (u) => {
+    setBusyId(u.uid);
+    try {
+      await accountService.purge(u.uid, actor?.uid);
+      setMembers((p) => p.filter((m) => m.uid !== u.uid)); // becomes a hidden tombstone
+      auditService.log({
+        schoolId: school.id, actor, action: 'Permanently deleted account',
+        targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
+      });
+    } catch (err) {
+      console.error('purge failed:', err);
+      flash(u.uid, err?.code === 'permission-denied'
+        ? 'Permission denied — the latest security rules may not be published yet.'
+        : 'Could not delete the account.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const counts = useMemo(() => {
     let active = 0, deactivated = 0, archived = 0;
     members.forEach((u) => {
       const st = (u.status || 'active').toLowerCase();
+      if (st === 'deleted') return; // tombstone — never counted
       if (st === 'archived') archived += 1;
       else if (st === 'deactivated') deactivated += 1;
       else active += 1;
@@ -267,6 +288,7 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
     const q = search.trim().toLowerCase();
     return members.filter((u) => {
       const st = (u.status || 'active').toLowerCase();
+      if (st === 'deleted') return false; // tombstones never shown
       // Archived accounts are hidden from every view except the Archived filter.
       if (statusFilter === 'all' && st === 'archived') return false;
       if (statusFilter === 'active' && st !== 'active') return false;
@@ -351,8 +373,9 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
                     <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
                     <p className="text-xs text-gray-400 truncate">{u.email}</p>
                     {status === 'archived' && (
-                      <p className="text-xs text-amber-600">
-                        Archived{u.archivedAt ? ` ${new Date(u.archivedAt).toLocaleDateString()}` : ''}{daysLeft != null ? ` · deletes in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : ''}
+                      <p className={`text-xs ${daysLeft === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                        Archived{u.archivedAt ? ` ${new Date(u.archivedAt).toLocaleDateString()}` : ''}
+                        {daysLeft != null ? (daysLeft === 0 ? ' · eligible for deletion' : ` · deletes in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`) : ''}
                       </p>
                     )}
                   </div>
@@ -365,6 +388,7 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
                       canDeactivate && status === 'deactivated' && { label: 'Reactivate account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, kind: 'reactivate' }) },
                       canDeactivate && status !== 'archived' && { label: 'Archive account', icon: <FiArchive className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmAction({ user: u, kind: 'archive' }) },
                       canDeactivate && status === 'archived' && { label: 'Restore account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, kind: 'restore' }) },
+                      canDeactivate && status === 'archived' && { label: 'Delete permanently', icon: <FiTrash2 className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmPurge(u) },
                     ]}
                   />
                 </div>
@@ -422,6 +446,17 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
           await changeStatus(user, cfg.status, cfg.audit);
           setConfirmAction(null);
         }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmPurge}
+        tone="danger"
+        title={`Permanently delete ${confirmPurge?.displayName || confirmPurge?.email || 'this account'}?`}
+        message="Their personal details are erased and they can't sign in — this can't be undone. A minimal record is kept for history. (Their login itself isn't removed; that needs the backend.)"
+        confirmLabel="Delete permanently"
+        busy={!!confirmPurge && busyId === confirmPurge.uid}
+        onCancel={() => setConfirmPurge(null)}
+        onConfirm={async () => { const u = confirmPurge; await purgeUser(u); setConfirmPurge(null); }}
       />
     </div>
   );
@@ -482,8 +517,8 @@ const Overview = ({ school, isSuper, onGo }) => {
     return () => { active = false; };
   }, [school.id]);
 
-  // Real, joined accounts by role (archived excluded); pending = invited, not joined.
-  const live = accounts.filter((u) => (u.status || 'active').toLowerCase() !== 'archived');
+  // Real, joined accounts by role (archived/deleted excluded); pending = invited, not joined.
+  const live = accounts.filter((u) => !['archived', 'deleted'].includes((u.status || 'active').toLowerCase()));
   const countRole = (role) => live.filter((u) => (u.userType || '') === role).length;
   const pending = (role) => invites.filter((i) => i.role === role && i.status !== 'accepted').length;
   const studentCount = countRole('student');

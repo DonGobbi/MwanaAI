@@ -16,14 +16,34 @@ export const accountService = {
       .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
   },
 
-  // Every non-archived account across the platform (Super Admin directory).
-  // Excludes the super admin themselves. Full scan — fine while small.
+  // Every live account across the platform (Super Admin directory). Excludes
+  // archived/deleted and the super admin. Full scan — fine while small.
   async listAll() {
     const snap = await getDocs(collection(db, 'users'));
     return snap.docs
       .map((d) => d.data())
-      .filter((u) => (u.status || 'active').toLowerCase() !== 'archived' && u.userType !== 'superadmin')
+      .filter((u) => !['archived', 'deleted'].includes((u.status || 'active').toLowerCase()) && u.userType !== 'superadmin')
       .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+  },
+
+  // Permanent delete as a tombstone: an archived account is anonymized and
+  // marked 'deleted' (blocked at sign-in, hidden from rosters). A minimal
+  // record stays for history; the audit log keeps who/when. No backend needed.
+  async purge(uid, actorUid) {
+    await updateDoc(doc(db, 'users', uid), {
+      status: 'deleted',
+      deletedAt: Date.now(),
+      deletedBy: actorUid || '',
+      displayName: '(deleted account)',
+      email: '',
+      phone: '',
+      gender: '',
+      dateOfBirth: '',
+      photoURL: '',
+      bio: '',
+      location: '',
+      updatedAt: new Date().toISOString(),
+    });
   },
 
   // Platform-wide head-count by role (Super Admin dashboard). Archived and the
@@ -36,7 +56,7 @@ export const accountService = {
     snap.docs.forEach((d) => {
       const u = d.data();
       const status = (u.status || 'active').toLowerCase();
-      if (status === 'archived') return;
+      if (status === 'archived' || status === 'deleted') return;
       if (status === 'deactivated') counts.deactivated += 1;
       if (counts[u.userType] == null) return;
       counts[u.userType] += 1;

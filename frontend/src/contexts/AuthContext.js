@@ -15,7 +15,7 @@ const SCHOOL_SUSPENDED_MSG =
 // suspended school, must not be allowed in. Returns { ok, message }.
 async function checkAccountAccess(profile) {
   const status = (profile?.status || 'active').toLowerCase();
-  if (status === 'deactivated' || status === 'archived') {
+  if (status === 'deactivated' || status === 'archived' || status === 'deleted') {
     return { ok: false, message: DEACTIVATED_MSG };
   }
   if (profile?.schoolId) {
