@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { collection, doc, getDocs, query, where, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, setDoc, orderBy, limit } from 'firebase/firestore';
 
 // A lightweight, best-effort audit trail of admin actions. Logging must never
 // break the action it describes, so log() swallows its own errors.
@@ -38,5 +38,13 @@ export const auditService = {
       .map((d) => d.data())
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, max);
+  },
+
+  // Latest entries across the whole platform, newest first (Super Admin only —
+  // the rules let a Super Admin read any audit log). orderBy+limit keeps it to
+  // just `max` reads.
+  async listRecent(max = 12) {
+    const snap = await getDocs(query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(max)));
+    return snap.docs.map((d) => d.data());
   },
 };

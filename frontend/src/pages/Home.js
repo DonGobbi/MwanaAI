@@ -7,6 +7,7 @@ import { assignmentService } from '../services/assignmentService';
 import { goalService } from '../services/goalService';
 import { schoolService } from '../services/schoolService';
 import { accountService } from '../services/accountService';
+import { auditService } from '../services/auditService';
 import { useCourses } from '../hooks/useCourses';
 import { computeStreak } from '../utils/streak';
 import { computeBadges } from '../utils/badges';
@@ -28,7 +29,19 @@ import {
   FiPlus,
   FiLayers,
   FiHome,
+  FiActivity,
 } from 'react-icons/fi';
+
+// Compact relative time for the activity feed.
+const ago = (ts) => {
+  if (!ts) return '';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24); if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
+};
 
 const STUDENT_CARDS = [
   { to: '/learn', icon: FiBookOpen, title: 'Learn', text: 'Guided lessons by topic.', color: 'bg-sky-100 text-sky-600' },
@@ -594,6 +607,7 @@ const AdminHome = ({ firstName, role }) => {
   const isSuper = role === 'superadmin';
   const [schools, setSchools] = useState([]);
   const [counts, setCounts] = useState({ student: 0, teacher: 0, admin: 0, parent: 0, total: 0 });
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -601,8 +615,12 @@ const AdminHome = ({ firstName, role }) => {
     (async () => {
       try {
         if (isSuper) {
-          const [sc, st] = await Promise.all([schoolService.listSchools(), accountService.platformStats()]);
-          if (active) { setSchools(sc); setCounts(st); }
+          const [sc, st, act] = await Promise.all([
+            schoolService.listSchools(),
+            accountService.platformStats(),
+            auditService.listRecent(10).catch(() => []),
+          ]);
+          if (active) { setSchools(sc); setCounts(st); setActivity(act); }
         } else if (userProfile?.schoolId) {
           const accts = await accountService.listBySchool(userProfile.schoolId);
           const c = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 };
@@ -676,6 +694,43 @@ const AdminHome = ({ firstName, role }) => {
                   </Link>
                 </li>
               ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Super Admin: recent activity across all schools */}
+      {isSuper && (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FiActivity className="text-primary-600" />
+            <h2 className="font-bold text-gray-900">Recent activity</h2>
+          </div>
+          {loading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : activity.length === 0 ? (
+            <p className="text-sm text-gray-500">No activity yet. Actions like invites, deactivations and school changes will show here.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {activity.map((l) => {
+                const schoolName = schools.find((s) => s.id === l.schoolId)?.name;
+                return (
+                  <li key={l.id} className="flex items-start gap-3 py-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FiActivity className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-800">
+                        <span className="font-medium">{l.actorName}</span> · {l.action}
+                        {l.targetName ? <> — <span className="text-gray-600">{l.targetName}</span></> : null}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {schoolName ? `${schoolName} · ` : ''}{ago(l.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
