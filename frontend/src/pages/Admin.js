@@ -18,8 +18,11 @@ import ActionMenu from '../components/ActionMenu';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
-  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiArchive,
+  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiArchive, FiActivity,
 } from 'react-icons/fi';
+
+const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'Admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
+const ROLE_TAB = { admin: 'admins', teacher: 'teachers', student: 'students', parent: 'parents' };
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
 const sendNote = (r) =>
@@ -1733,6 +1736,218 @@ const NoSchoolAssigned = () => (
   </div>
 );
 
+// ---- Platform-wide activity feed (Super Admin) ----
+const PLATFORM_PAGE_SIZE = 15;
+
+const PlatformActivity = () => {
+  const [logs, setLogs] = useState([]);
+  const [schoolNames, setSchoolNames] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [l, sc] = await Promise.all([auditService.listRecent(200), schoolService.listSchools()]);
+        if (!alive) return;
+        setLogs(l);
+        const map = {}; sc.forEach((s) => { map[s.id] = s.name; });
+        setSchoolNames(map);
+      } catch (err) {
+        console.error('Could not load activity:', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? logs.filter((l) => `${l.actorName} ${l.action} ${l.targetName} ${schoolNames[l.schoolId] || ''}`.toLowerCase().includes(q)) : logs;
+  }, [logs, search, schoolNames]);
+  useEffect(() => { setPage(0); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PLATFORM_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * PLATFORM_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PLATFORM_PAGE_SIZE);
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container py-8 max-w-4xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Activity</h1>
+        <p className="text-gray-600 text-sm mb-6">Every admin action across all schools — who did what, and when.</p>
+        <div className="card p-5">
+          {loading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : logs.length === 0 ? (
+            <p className="text-sm text-gray-400">No activity recorded yet.</p>
+          ) : (
+            <>
+              <div className="relative mb-3 max-w-sm">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search activity"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+              </div>
+              {filtered.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4">No activity matches your search.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {pageItems.map((l) => (
+                    <li key={l.id} className="flex items-start gap-3 py-2.5">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">{actionIcon(l.action)}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-800">
+                          <span className="font-medium">{l.actorName}</span> · {l.action}
+                          {l.targetName ? <> — <span className="text-gray-600">{l.targetName}</span></> : null}
+                        </p>
+                        <p className="text-xs text-gray-400">{schoolNames[l.schoolId] ? `${schoolNames[l.schoolId]} · ` : ''}{formatDateTime(l.createdAt)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {filtered.length > 0 && totalPages > 1 && (
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + PLATFORM_PAGE_SIZE)} of {filtered.length}</p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page" className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                    <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+                    <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page" className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---- Platform-wide user directory (Super Admin) ----
+const PlatformUsers = () => {
+  const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
+  const [schoolNames, setSchoolNames] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [all, sc] = await Promise.all([accountService.listAll(), schoolService.listSchools()]);
+        if (!alive) return;
+        setUsers(all);
+        const map = {}; sc.forEach((s) => { map[s.id] = s.name; });
+        setSchoolNames(map);
+      } catch (err) {
+        console.error('Could not load users:', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const counts = useMemo(() => {
+    const c = { all: users.length, student: 0, teacher: 0, admin: 0, parent: 0 };
+    users.forEach((u) => { if (c[u.userType] != null) c[u.userType] += 1; });
+    return c;
+  }, [users]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter !== 'all' && u.userType !== roleFilter) return false;
+      if (!q) return true;
+      return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+    });
+  }, [users, search, roleFilter]);
+  useEffect(() => { setPage(0); }, [search, roleFilter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PLATFORM_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * PLATFORM_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PLATFORM_PAGE_SIZE);
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container py-8 max-w-4xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Users</h1>
+        <p className="text-gray-600 text-sm mb-6">Everyone across the platform. Open a person to manage them in their school.</p>
+        <div className="card p-5">
+          {loading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : users.length === 0 ? (
+            <p className="text-sm text-gray-400">No accounts yet.</p>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                <div className="relative flex-1">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                {[
+                  { key: 'all', label: 'All' }, { key: 'student', label: 'Students' }, { key: 'teacher', label: 'Teachers' },
+                  { key: 'admin', label: 'Admins' }, { key: 'parent', label: 'Parents' },
+                ].map((f) => (
+                  <button key={f.key} onClick={() => setRoleFilter(f.key)}
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${roleFilter === f.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {f.label} ({counts[f.key] || 0})
+                  </button>
+                ))}
+              </div>
+              {filtered.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">No users match.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {pageItems.map((u) => {
+                    const initials = (u.displayName || u.email || 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+                    const canOpen = u.schoolId && ROLE_TAB[u.userType];
+                    return (
+                      <li key={u.uid} className="flex items-center gap-3 py-2.5">
+                        <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">{initials}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
+                          <p className="text-xs text-gray-400 truncate">{u.email}{schoolNames[u.schoolId] ? ` · ${schoolNames[u.schoolId]}` : ''}</p>
+                        </div>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex-shrink-0">{ROLE_LABEL[u.userType] || u.userType}</span>
+                        {canOpen && (
+                          <button onClick={() => navigate(`/admin/schools/${u.schoolId}/${ROLE_TAB[u.userType]}`)}
+                            className="text-xs text-primary-600 hover:underline inline-flex items-center gap-1 flex-shrink-0">
+                            Open <FiArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {filtered.length > 0 && totalPages > 1 && (
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + PLATFORM_PAGE_SIZE)} of {filtered.length}</p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page" className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                    <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+                    <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page" className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Admin = () => {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
@@ -1760,6 +1975,8 @@ const Admin = () => {
           )
         }
       />
+      <Route path="users" element={isSuper ? <PlatformUsers /> : <Navigate to="/admin" replace />} />
+      <Route path="activity" element={isSuper ? <PlatformActivity /> : <Navigate to="/admin" replace />} />
       <Route path="schools/:schoolId" element={<SchoolOverviewRedirect />} />
       <Route path="schools/:schoolId/:tab" element={<ManageSchoolRoute admin={currentUser} isSuper={isSuper} userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />

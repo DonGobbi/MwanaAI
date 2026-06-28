@@ -16,6 +16,16 @@ export const accountService = {
       .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
   },
 
+  // Every non-archived account across the platform (Super Admin directory).
+  // Excludes the super admin themselves. Full scan — fine while small.
+  async listAll() {
+    const snap = await getDocs(collection(db, 'users'));
+    return snap.docs
+      .map((d) => d.data())
+      .filter((u) => (u.status || 'active').toLowerCase() !== 'archived' && u.userType !== 'superadmin')
+      .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+  },
+
   // Platform-wide head-count by role (Super Admin dashboard). Archived and the
   // super admin are excluded. NOTE: scans the users collection — fine while the
   // platform is small; swap for maintained aggregate counters at large scale.

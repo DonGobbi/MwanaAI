@@ -13,6 +13,7 @@ import {
   FiFolder,
   FiLayers,
   FiHome,
+  FiActivity,
 } from 'react-icons/fi';
 
 const NAV = {
@@ -60,7 +61,9 @@ const NAV = {
       label: 'Platform',
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
-        { to: '/admin', icon: FiHome, text: 'Schools' },
+        { to: '/admin', icon: FiHome, text: 'Schools', end: true },
+        { to: '/admin/users', icon: FiUsers, text: 'Users' },
+        { to: '/admin/activity', icon: FiActivity, text: 'Activity' },
       ],
     },
     {
