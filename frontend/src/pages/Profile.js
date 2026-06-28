@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
 import firebaseService from '../services/firebaseService';
-import { uploadFile } from '../services/fileUploadService';
+import { generateThumbnail } from '../services/fileUploadService';
 import { calculateAge, formatDate, todayISO } from '../utils/age';
 import { getGradeLevel } from '../config/curriculum';
 import {
@@ -286,16 +286,18 @@ const Profile = () => {
     setPhotoError('');
     setUploadingPhoto(true);
     try {
-      const url = await uploadFile(file, 'avatars');
-      const user = firebaseService.getCurrentUser();
-      await updateProfile(user, { photoURL: url });
-      await firebaseService.saveUserProfile({ photoURL: url });
-      setUserData((p) => ({ ...p, profileImage: url }));
-      setFormData((p) => ({ ...p, profileImage: url }));
+      // Shrink to a small square in the browser and store it on the profile —
+      // no Firebase Storage round-trip (which was hanging when Storage isn't
+      // configured). The thumbnail is a compact JPEG data URL.
+      const dataUrl = await generateThumbnail(file);
+      if (!dataUrl) throw new Error('Could not read that image.');
+      await firebaseService.saveUserProfile({ photoURL: dataUrl });
+      setUserData((p) => ({ ...p, profileImage: dataUrl }));
+      setFormData((p) => ({ ...p, profileImage: dataUrl }));
       setSuccessMessage('Profile photo updated!');
     } catch (err) {
-      console.error('Photo upload error:', err);
-      setPhotoError('Could not upload the photo. Please try again.');
+      console.error('Photo update error:', err);
+      setPhotoError('Could not update the photo. Please try a different image.');
     } finally {
       setUploadingPhoto(false);
     }
