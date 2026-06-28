@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { FiZap, FiRefreshCw, FiSend } from 'react-icons/fi';
 import Card from './Card';
 import Markdown from './Markdown';
+import { useAuth } from '../contexts/AuthContext';
 import { aiInsights } from '../services/aiInsightsService';
 import { accountService } from '../services/accountService';
 import { schoolService } from '../services/schoolService';
@@ -32,7 +33,7 @@ const MEMBER_CAP = 150; // safety cap so a huge platform can't blow the token bu
 // Turn the live platform data into a compact, factual snapshot the AI reasons
 // over. Flags are computed here (deterministic) so the AI never has to guess,
 // and the actual people in each school are listed so it can answer "who" too.
-function buildSnapshot({ stats, schools, members, activity, schoolName, generatedAt }) {
+function buildSnapshot({ stats, schools, members, admins, activity, schoolName, generatedAt, viewer }) {
   const suspended = schools.filter((s) => (s.status || 'active').toLowerCase() !== 'active').length;
   const totals = `${stats.student} students, ${stats.teacher} teachers, ${stats.admin} school admins, ${stats.parent} parents across ${schools.length} school(s) (${suspended} not active). ${stats.deactivated} account(s) deactivated. ${stats.total} active accounts in total.`;
 
@@ -59,6 +60,12 @@ function buildSnapshot({ stats, schools, members, activity, schoolName, generate
   const orphans = bySchoolMembers.__none__ || [];
   const orphanBlock = orphans.length ? `\nNot assigned to any school:\n${orphans.map(memberLine).join('\n')}` : '';
 
+  // Platform super administrators (no school) — so "everyone" includes them.
+  const adminLines = (admins || [])
+    .map((a) => `  - ${a.displayName || 'Unnamed'} <${a.email || 'no email on file'}> — super administrator (${(a.status || 'active').toLowerCase()})`)
+    .join('\n');
+  const adminBlock = adminLines ? `\n\nPlatform super administrators (oversee the whole platform, not attached to a school):\n${adminLines}` : '';
+
   const flags = [];
   schools.forEach((s) => {
     const b = stats.bySchool[s.id] || {};
@@ -77,11 +84,15 @@ function buildSnapshot({ stats, schools, members, activity, schoolName, generate
     })
     .join('\n');
 
+  const viewerLine = viewer
+    ? `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the platform super administrator who is asking these questions. When they say "me", "I" or "my", they mean this account, and they are one of the platform super administrators listed below.\n\n`
+    : '';
+
   return `PLATFORM SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
-Totals: ${totals}
+${viewerLine}Totals: ${totals}
 
 Schools and the people in them${truncated ? ` (showing the first ${MEMBER_CAP} of ${members.length} accounts)` : ''}:
-${schoolLines || '(no schools yet)'}${orphanBlock}
+${schoolLines || '(no schools yet)'}${orphanBlock}${adminBlock}
 
 Flags (computed):
 ${flags.length ? flags.map((f) => `- ${f}`).join('\n') : '- none'}
@@ -91,6 +102,7 @@ ${activityLines || '(no recent activity recorded)'}`;
 }
 
 const PlatformInsights = () => {
+  const { currentUser, userProfile } = useAuth();
   const [snapshot, setSnapshot] = useState('');
   const [briefing, setBriefing] = useState('');
   const [loading, setLoading] = useState(true);
@@ -104,16 +116,22 @@ const PlatformInsights = () => {
     setError('');
     setAnswer('');
     try {
-      const [stats, schools, members, activity] = await Promise.all([
+      const [stats, schools, members, admins, activity] = await Promise.all([
         accountService.platformStats(),
         schoolService.listSchools(),
         accountService.listAll(),
+        accountService.listSuperAdmins(),
         auditService.listRecent(25),
       ]);
       const schoolName = {};
       schools.forEach((s) => { schoolName[s.id] = s.name; });
       const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-      const snap = buildSnapshot({ stats, schools, members, activity, schoolName, generatedAt });
+      const viewer = {
+        name: currentUser?.displayName || userProfile?.displayName || currentUser?.email || 'the administrator',
+        email: currentUser?.email || '',
+        uid: currentUser?.uid || '',
+      };
+      const snap = buildSnapshot({ stats, schools, members, admins, activity, schoolName, generatedAt, viewer });
       setSnapshot(snap);
       const text = await aiInsights.platformBriefing({ snapshot: snap });
       setBriefing(text);
@@ -123,7 +141,7 @@ const PlatformInsights = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser, userProfile]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -45,6 +45,15 @@ export const accountService = {
     }
   },
 
+  // Platform super administrators (not attached to any school). Single-field
+  // query — no composite index. Excludes archived/deleted.
+  async listSuperAdmins() {
+    const snap = await getDocs(query(collection(db, 'users'), where('userType', '==', 'superadmin')));
+    return snap.docs
+      .map((d) => d.data())
+      .filter((u) => !['archived', 'deleted'].includes((u.status || 'active').toLowerCase()));
+  },
+
   // Permanent delete as a tombstone: an archived account is anonymized and
   // marked 'deleted' (blocked at sign-in, hidden from rosters). A minimal
   // record stays for history; the audit log keeps who/when. No backend needed.
