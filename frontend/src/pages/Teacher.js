@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
@@ -389,30 +390,20 @@ const ClassNeedsAttention = ({ intel, members, onSelect }) => {
   );
 };
 
-const Teacher = () => {
+// ---- Classes list + create a class (index of /teacher) ----
+const ClassesHome = () => {
   const { currentUser, userProfile } = useAuth();
+  const navigate = useNavigate();
   const { subjects: subjectChoices } = useSchoolSubjects(userProfile?.schoolId);
   // Resolve a subject's label from the school catalogue, falling back to the
   // standard list, then the raw value.
   const subjectLabelOf = (val) => subjectChoices.find((s) => s.value === val)?.label || getSubject(val)?.label || val;
-  const [selectedStudent, setSelectedStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newSubject, setNewSubject] = useState('');
   const [newLevel, setNewLevel] = useState('');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
-
-  const [active, setActive] = useState(null);
-  const [tab, setTab] = useState('create');
-  const [members, setMembers] = useState([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const [insights, setInsights] = useState('');
-  const [loadingInsights, setLoadingInsights] = useState(false);
-  const [classIntel, setClassIntel] = useState(null); // deterministic, auto-surfaced
 
   const loadClasses = useCallback(async () => {
     if (!currentUser) return;
@@ -424,10 +415,7 @@ const Teacher = () => {
       setLoading(false);
     }
   }, [currentUser]);
-
-  useEffect(() => {
-    loadClasses();
-  }, [loadClasses]);
+  useEffect(() => { loadClasses(); }, [loadClasses]);
 
   const createClass = async (e) => {
     e.preventDefault();
@@ -457,252 +445,6 @@ const Teacher = () => {
     }
   };
 
-  const handleDeleteClass = async () => {
-    if (!active) return;
-    setDeleting(true);
-    try {
-      await classService.deleteClass(active.id);
-      setActive(null);
-      setConfirmDelete(false);
-      loadClasses();
-    } catch (err) {
-      console.error('Could not delete class:', err);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const openClass = async (cls) => {
-    setActive(cls);
-    setTab('create');
-    setSelectedStudent(null);
-    setLoadingMembers(true);
-    setMembers([]);
-    setInsights('');
-    setClassIntel(null);
-    setConfirmDelete(false);
-    try {
-      const [roster, classResults, assignments] = await Promise.all([
-        classService.getMembers(cls),
-        quizService.listByClass(cls.id),
-        assignmentService.listForClass(cls.id),
-      ]);
-      // Per-student stats scoped to THIS class only (assignment quizzes carry classId).
-      const perStudent = {};
-      classResults.forEach((r) => {
-        const s = perStudent[r.userId] || (perStudent[r.userId] = { n: 0, sum: 0, last: 0 });
-        s.n += 1;
-        s.sum += r.percentage || 0;
-        s.last = Math.max(s.last, r.createdAt || 0);
-      });
-      const withStats = roster.map((m) => {
-        const s = perStudent[m.studentId];
-        return {
-          ...m,
-          classStats: {
-            quizCount: s ? s.n : 0,
-            avgScore: s && s.n ? Math.round(s.sum / s.n) : null,
-            lastActive: s ? s.last : null,
-          },
-        };
-      });
-      setMembers(withStats);
-
-      // Auto-surface struggling topics & students (instant, no AI call needed).
-      const topicOf = {};
-      assignments.forEach((a) => { topicOf[a.id] = (a.topic && a.topic.trim()) || a.title || 'General'; });
-      const nameById = {};
-      roster.forEach((m) => { nameById[m.studentId] = m.studentName; });
-      setClassIntel(analyzeClassData({ results: classResults, topicOf, nameById }));
-    } catch (err) {
-      console.error('Could not load roster:', err);
-    } finally {
-      setLoadingMembers(false);
-    }
-  };
-
-  // AI narrative — reuses the deterministic summary already surfaced above.
-  const analyzeClass = async () => {
-    setLoadingInsights(true);
-    setInsights('');
-    try {
-      if (!classIntel || !classIntel.hasData) {
-        setInsights(
-          'No quiz data for this class yet. Assign a quiz on a topic (Assignments tab) — once students take it, MwanaAI will show which topics the class is struggling with.'
-        );
-        return;
-      }
-      const result = await aiInsights.classTopicInsights({
-        className: active.name,
-        subject: active.subjectLabel,
-        level: active.levelLabel,
-        topicStats: classIntel.topicStats,
-        studentWeak: classIntel.studentWeak,
-        missedConcepts: classIntel.missedConcepts,
-      });
-      setInsights(result);
-    } catch (err) {
-      setInsights(`*${err.message || 'Could not analyse the class.'}*`);
-    } finally {
-      setLoadingInsights(false);
-    }
-  };
-
-  // ---- Single student detail ----
-  if (active && selectedStudent) {
-    return <StudentDetail member={selectedStudent} cls={active} onBack={() => setSelectedStudent(null)} />;
-  }
-
-  // ---- Class detail ----
-  if (active) {
-    return (
-      <div className="bg-gray-50 min-h-screen">
-        <div className="container py-8 max-w-4xl">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => { setActive(null); setConfirmDelete(false); }} className="text-sm text-primary-600 hover:underline">
-              ← Back to classes
-            </button>
-            <button onClick={() => setConfirmDelete(true)}
-              className="text-sm text-gray-400 hover:text-red-600 inline-flex items-center gap-1 transition-colors">
-              <FiTrash2 className="w-4 h-4" /> Delete class
-            </button>
-          </div>
-
-          {confirmDelete && (
-            <div className="card p-4 mb-4 border border-red-200 bg-red-50 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-red-700">
-                Delete <strong>{active.name}</strong>? This removes the class and its assignments and can't be undone.
-              </p>
-              <div className="flex gap-2 flex-shrink-0">
-                <button onClick={() => setConfirmDelete(false)} disabled={deleting}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50">Cancel</button>
-                <button onClick={handleDeleteClass} disabled={deleting}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
-                  {deleting ? 'Deleting…' : 'Delete class'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="card p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{active.name}</h1>
-              <p className="text-sm text-gray-500">{members.length} student{members.length !== 1 ? 's' : ''}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Class code</p>
-              <p className="text-2xl font-bold tracking-widest text-primary-600">{active.code}</p>
-              <p className="text-xs text-gray-400">Share with students to join</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
-            {CLASS_TABS.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                  tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}>
-                <t.icon className="w-4 h-4" /> {t.label}
-                {t.id === 'students' && members.length > 0 && (
-                  <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5">{members.length}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'create' && <ClassGenerator cls={active} teacher={currentUser} />}
-
-          {tab === 'resources' && <ClassResources cls={active} teacher={currentUser} />}
-
-          {tab === 'assignments' && <Assignments cls={active} teacher={currentUser} memberCount={members.length} />}
-
-          {tab === 'students' && (
-            <>
-              {/* Auto-surfaced: what to re-teach & who needs help (instant) */}
-              <ClassNeedsAttention intel={classIntel} members={members} onSelect={setSelectedStudent} />
-
-              {/* AI Class Insights — a written report on top of the above */}
-              <div className="card p-5 mb-5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <FiBarChart2 className="text-primary-600" />
-                    <h2 className="font-bold text-gray-900">AI Class Insights</h2>
-                  </div>
-                  <button onClick={analyzeClass} disabled={loadingMembers || loadingInsights}
-                    className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                    {loadingInsights ? <Spinner className="w-4 h-4" label="Analysing…" /> : '✨ Analyse class'}
-                  </button>
-                </div>
-                {insights ? (
-                  <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
-                    <Markdown content={insights} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 mt-2">
-                    See how this {active.subjectLabel || 'class'} class is doing by <strong>topic</strong> — which
-                    topics to re-teach and which students need attention. Based on the quizzes you assign.
-                  </p>
-                )}
-              </div>
-
-              {loadingMembers ? (
-                <PageLoader label="Loading students…" />
-              ) : members.length === 0 ? (
-                <div className="card p-6">
-                  <EmptyState compact icon={FiUsers} title="No students yet"
-                    description={`Share the code ${active.code} with your class so students can join.`} />
-                </div>
-              ) : (
-                <div className="card overflow-hidden">
-                  <p className="text-xs text-gray-400 px-4 pt-3">Quizzes &amp; averages are for this class only.</p>
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                      <tr>
-                        <th className="text-left px-4 py-2">Student</th>
-                        <th className="text-center px-2 py-2">Quizzes</th>
-                        <th className="text-center px-2 py-2">Avg</th>
-                        <th className="text-right px-4 py-2">Active</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {members.map((m) => (
-                        <tr key={m.id} onClick={() => setSelectedStudent(m)}
-                          className="cursor-pointer hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-gray-800 flex items-center gap-2">
-                              {m.studentName}
-                              {m.classStats.avgScore != null && m.classStats.avgScore < 60 && (
-                                <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">needs help</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-400">{m.studentEmail}</p>
-                          </td>
-                          <td className="text-center px-2 py-3 text-gray-600">{m.classStats.quizCount}</td>
-                          <td className="text-center px-2 py-3">
-                            <span className={`font-semibold ${
-                              m.classStats.avgScore == null ? 'text-gray-300'
-                              : m.classStats.avgScore >= 80 ? 'text-green-600'
-                              : m.classStats.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
-                            }`}>
-                              {m.classStats.avgScore == null ? '—' : `${m.classStats.avgScore}%`}
-                            </span>
-                          </td>
-                          <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.classStats.lastActive)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Classes list ----
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container py-8 max-w-6xl">
@@ -769,7 +511,7 @@ const Teacher = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {classes.map((c) => (
-              <button key={c.id} onClick={() => openClass(c)}
+              <button key={c.id} onClick={() => navigate(`/teacher/class/${c.id}/create`)}
                 className="text-left card p-4 hover:shadow-md hover:border-primary-200 flex items-center justify-between transition-all">
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-800 truncate">{c.name}</p>
@@ -787,5 +529,316 @@ const Teacher = () => {
     </div>
   );
 };
+
+// ---- One class: tabs (Create / Resources / Assignments / Students) + student detail ----
+// Loaded by the :classId in the URL; the active tab and any open student also
+// come from the URL, so every spot is bookmarkable / refreshable.
+const ClassWorkspace = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { classId, tab, studentId } = useParams();
+
+  const [active, setActive] = useState(null);
+  const [loadingClass, setLoadingClass] = useState(true);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [insights, setInsights] = useState('');
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [classIntel, setClassIntel] = useState(null); // deterministic, auto-surfaced
+
+  // Load the class + its roster/results whenever the class in the URL changes.
+  useEffect(() => {
+    let alive = true;
+    setLoadingClass(true);
+    setLoadingMembers(true);
+    setMembers([]);
+    setInsights('');
+    setClassIntel(null);
+    setConfirmDelete(false);
+    (async () => {
+      try {
+        const cls = await classService.getClass(classId);
+        if (!alive) return;
+        setActive(cls);
+        if (!cls) { setLoadingMembers(false); return; }
+        const [roster, classResults, assignments] = await Promise.all([
+          classService.getMembers(cls),
+          quizService.listByClass(cls.id),
+          assignmentService.listForClass(cls.id),
+        ]);
+        if (!alive) return;
+        // Per-student stats scoped to THIS class only (assignment quizzes carry classId).
+        const perStudent = {};
+        classResults.forEach((r) => {
+          const s = perStudent[r.userId] || (perStudent[r.userId] = { n: 0, sum: 0, last: 0 });
+          s.n += 1;
+          s.sum += r.percentage || 0;
+          s.last = Math.max(s.last, r.createdAt || 0);
+        });
+        const withStats = roster.map((m) => {
+          const s = perStudent[m.studentId];
+          return {
+            ...m,
+            classStats: {
+              quizCount: s ? s.n : 0,
+              avgScore: s && s.n ? Math.round(s.sum / s.n) : null,
+              lastActive: s ? s.last : null,
+            },
+          };
+        });
+        setMembers(withStats);
+
+        // Auto-surface struggling topics & students (instant, no AI call needed).
+        const topicOf = {};
+        assignments.forEach((a) => { topicOf[a.id] = (a.topic && a.topic.trim()) || a.title || 'General'; });
+        const nameById = {};
+        roster.forEach((m) => { nameById[m.studentId] = m.studentName; });
+        setClassIntel(analyzeClassData({ results: classResults, topicOf, nameById }));
+      } catch (err) {
+        console.error('Could not load class:', err);
+      } finally {
+        if (alive) { setLoadingClass(false); setLoadingMembers(false); }
+      }
+    })();
+    return () => { alive = false; };
+  }, [classId]);
+
+  const handleDeleteClass = async () => {
+    setDeleting(true);
+    try {
+      await classService.deleteClass(classId);
+      navigate('/teacher');
+    } catch (err) {
+      console.error('Could not delete class:', err);
+      setDeleting(false);
+    }
+  };
+
+  // AI narrative — reuses the deterministic summary already surfaced above.
+  const analyzeClass = async () => {
+    setLoadingInsights(true);
+    setInsights('');
+    try {
+      if (!classIntel || !classIntel.hasData) {
+        setInsights(
+          'No quiz data for this class yet. Assign a quiz on a topic (Assignments tab) — once students take it, MwanaAI will show which topics the class is struggling with.'
+        );
+        return;
+      }
+      const result = await aiInsights.classTopicInsights({
+        className: active.name,
+        subject: active.subjectLabel,
+        level: active.levelLabel,
+        topicStats: classIntel.topicStats,
+        studentWeak: classIntel.studentWeak,
+        missedConcepts: classIntel.missedConcepts,
+      });
+      setInsights(result);
+    } catch (err) {
+      setInsights(`*${err.message || 'Could not analyse the class.'}*`);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
+  const activeTab = CLASS_TABS.some((t) => t.id === tab) ? tab : 'create';
+
+  if (loadingClass) {
+    return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-4xl"><PageLoader label="Loading class…" /></div></div>;
+  }
+  if (!active) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container py-10 max-w-2xl text-center">
+          <div className="card p-8">
+            <FiUsers className="w-8 h-8 text-primary-600 mx-auto mb-3" />
+            <h1 className="text-xl font-bold text-gray-900 mb-1">Class not found</h1>
+            <p className="text-sm text-gray-500 mb-4">This class may have been removed.</p>
+            <button onClick={() => navigate('/teacher')} className="text-sm text-primary-600 hover:underline">← Back to classes</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Single student detail ----
+  if (studentId) {
+    const member = members.find((m) => m.studentId === studentId);
+    if (!member) {
+      if (loadingMembers) {
+        return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-4xl"><PageLoader label="Loading…" /></div></div>;
+      }
+      return <Navigate to={`/teacher/class/${classId}/students`} replace />;
+    }
+    return <StudentDetail member={member} cls={active} onBack={() => navigate(`/teacher/class/${classId}/students`)} />;
+  }
+
+  const goTab = (t) => navigate(`/teacher/class/${classId}/${t}`);
+  const openStudent = (m) => navigate(`/teacher/class/${classId}/student/${m.studentId}`);
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container py-8 max-w-4xl">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => navigate('/teacher')} className="text-sm text-primary-600 hover:underline">
+            ← Back to classes
+          </button>
+          <button onClick={() => setConfirmDelete(true)}
+            className="text-sm text-gray-400 hover:text-red-600 inline-flex items-center gap-1 transition-colors">
+            <FiTrash2 className="w-4 h-4" /> Delete class
+          </button>
+        </div>
+
+        {confirmDelete && (
+          <div className="card p-4 mb-4 border border-red-200 bg-red-50 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-red-700">
+              Delete <strong>{active.name}</strong>? This removes the class and its assignments and can't be undone.
+            </p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting}
+                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+              <button onClick={handleDeleteClass} disabled={deleting}
+                className="px-3 py-1.5 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                {deleting ? 'Deleting…' : 'Delete class'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="card p-5 mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{active.name}</h1>
+            <p className="text-sm text-gray-500">{members.length} student{members.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Class code</p>
+            <p className="text-2xl font-bold tracking-widest text-primary-600">{active.code}</p>
+            <p className="text-xs text-gray-400">Share with students to join</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
+          {CLASS_TABS.map((t) => (
+            <button key={t.id} onClick={() => goTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                activeTab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}>
+              <t.icon className="w-4 h-4" /> {t.label}
+              {t.id === 'students' && members.length > 0 && (
+                <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5">{members.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'create' && <ClassGenerator cls={active} teacher={currentUser} />}
+
+        {activeTab === 'resources' && <ClassResources cls={active} teacher={currentUser} />}
+
+        {activeTab === 'assignments' && <Assignments cls={active} teacher={currentUser} memberCount={members.length} />}
+
+        {activeTab === 'students' && (
+          <>
+            {/* Auto-surfaced: what to re-teach & who needs help (instant) */}
+            <ClassNeedsAttention intel={classIntel} members={members} onSelect={openStudent} />
+
+            {/* AI Class Insights — a written report on top of the above */}
+            <div className="card p-5 mb-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <FiBarChart2 className="text-primary-600" />
+                  <h2 className="font-bold text-gray-900">AI Class Insights</h2>
+                </div>
+                <button onClick={analyzeClass} disabled={loadingMembers || loadingInsights}
+                  className="inline-flex items-center bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {loadingInsights ? <Spinner className="w-4 h-4" label="Analysing…" /> : '✨ Analyse class'}
+                </button>
+              </div>
+              {insights ? (
+                <div className="mt-4 border-t border-gray-100 pt-4 animate-fade-in">
+                  <Markdown content={insights} />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">
+                  See how this {active.subjectLabel || 'class'} class is doing by <strong>topic</strong> — which
+                  topics to re-teach and which students need attention. Based on the quizzes you assign.
+                </p>
+              )}
+            </div>
+
+            {loadingMembers ? (
+              <PageLoader label="Loading students…" />
+            ) : members.length === 0 ? (
+              <div className="card p-6">
+                <EmptyState compact icon={FiUsers} title="No students yet"
+                  description={`Share the code ${active.code} with your class so students can join.`} />
+              </div>
+            ) : (
+              <div className="card overflow-hidden">
+                <p className="text-xs text-gray-400 px-4 pt-3">Quizzes &amp; averages are for this class only.</p>
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="text-left px-4 py-2">Student</th>
+                      <th className="text-center px-2 py-2">Quizzes</th>
+                      <th className="text-center px-2 py-2">Avg</th>
+                      <th className="text-right px-4 py-2">Active</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {members.map((m) => (
+                      <tr key={m.id} onClick={() => openStudent(m)}
+                        className="cursor-pointer hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-800 flex items-center gap-2">
+                            {m.studentName}
+                            {m.classStats.avgScore != null && m.classStats.avgScore < 60 && (
+                              <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">needs help</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400">{m.studentEmail}</p>
+                        </td>
+                        <td className="text-center px-2 py-3 text-gray-600">{m.classStats.quizCount}</td>
+                        <td className="text-center px-2 py-3">
+                          <span className={`font-semibold ${
+                            m.classStats.avgScore == null ? 'text-gray-300'
+                            : m.classStats.avgScore >= 80 ? 'text-green-600'
+                            : m.classStats.avgScore >= 50 ? 'text-primary-600' : 'text-amber-600'
+                          }`}>
+                            {m.classStats.avgScore == null ? '—' : `${m.classStats.avgScore}%`}
+                          </span>
+                        </td>
+                        <td className="text-right px-4 py-3 text-xs text-gray-400">{timeAgo(m.classStats.lastActive)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// /teacher/class/:classId (no tab) → land on the Create tab.
+const ClassRedirect = () => {
+  const { classId } = useParams();
+  return <Navigate to={`/teacher/class/${classId}/create`} replace />;
+};
+
+const Teacher = () => (
+  <Routes>
+    <Route index element={<ClassesHome />} />
+    <Route path="class/:classId/student/:studentId" element={<ClassWorkspace />} />
+    <Route path="class/:classId/:tab" element={<ClassWorkspace />} />
+    <Route path="class/:classId" element={<ClassRedirect />} />
+    <Route path="*" element={<Navigate to="/teacher" replace />} />
+  </Routes>
+);
 
 export default Teacher;
