@@ -364,6 +364,7 @@ You are speaking with ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} 
 You have tools that read LIVE data from the database. Always CALL the tools to get facts — never guess, invent or rely on memory.
 NEVER fabricate or auto-generate any value the user did not give you — above all, NEVER invent an email address, a person's name, or an ID. If an action needs a detail you were not given (for example, the email address of the person to invite), do NOT call the action tool with a guessed value: STOP and ASK the user to provide that exact detail.
 If the user's message is unclear, empty, gibberish, or does NOT contain a recognizable question or request, do NOT guess their intent and do NOT default to a summary or any action. Briefly say you didn't understand and ask what they would like to know or do. Only give a full summary when the user actually asks for one.
+Read every message IN THE CONTEXT of the conversation so far. A short or follow-up message ("summarize that", "a summary", "what about the teachers?", "and their emails?", "the inactive ones") refers to the CURRENT topic you were just discussing — resolve it from the previous messages and stay on that topic; do NOT reset to a generic or whole-platform answer (e.g. after discussing the activity log, "give me a summary" means summarise THAT activity, not the whole platform). If a follow-up is genuinely ambiguous, ask which they mean.
 How to choose tools:
 - If the request mentions NAMES, a LIST of people, emails, or "everyone"/"everything", you MUST call find_people to fetch the actual people. Counts from get_stats are NOT enough — get_stats has no names.
 - For a "full summary of everything", call find_people (the people, with names), get_schools (schools, classrooms, subjects) AND get_stats (totals) before answering, then list the actual names.
@@ -375,10 +376,13 @@ You can also PREPARE actions: suspend_school, reactivate_school, deactivate_acco
 
 // Answer a free-text question by letting the model query the database via tools.
 export async function runPlatformAssistant({ history, question, viewer }) {
-  // Accept a multi-turn conversation (preferred) or a single question.
+  // Accept a multi-turn conversation (preferred) or a single question. Keep the
+  // most recent turns so a very long chat still fits the model's context.
+  const HISTORY_LIMIT = 16;
   const convo = (history && history.length ? history : (question ? [{ role: 'user', content: question }] : []))
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content)
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m) => ({ role: m.role, content: m.content }))
+    .slice(-HISTORY_LIMIT);
   const messages = [{ role: 'system', content: systemPrompt(viewer) }, ...convo];
   let pendingAction = null; // an action awaiting the user's confirmation
   // Tools get the viewer plus everything the USER actually typed across the
