@@ -1,9 +1,36 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import firebaseService from '../services/firebaseService';
 import { inviteService } from '../services/inviteService';
+import { schoolService } from '../services/schoolService';
 import { PageLoader } from '../components/Spinner';
 
 const GRADE_LEVEL_KEY = 'mwanaai_grade_level';
+
+const DEACTIVATED_MSG =
+  'Your account has been deactivated. Please contact your school administrator if you believe this is a mistake.';
+const SCHOOL_SUSPENDED_MSG =
+  "Your school's access has been suspended. Please contact your system administrator.";
+
+// Gate every sign-in: a deactivated/archived account, or a member of a
+// suspended school, must not be allowed in. Returns { ok, message }.
+async function checkAccountAccess(profile) {
+  const status = (profile?.status || 'active').toLowerCase();
+  if (status === 'deactivated' || status === 'archived') {
+    return { ok: false, message: DEACTIVATED_MSG };
+  }
+  if (profile?.schoolId) {
+    try {
+      const school = await schoolService.getSchool(profile.schoolId);
+      const sStatus = (school?.status || 'active').toLowerCase();
+      if (sStatus === 'deactivated' || sStatus === 'archived' || sStatus === 'suspended') {
+        return { ok: false, message: SCHOOL_SUSPENDED_MSG };
+      }
+    } catch (_) {
+      /* can't read the school doc — don't block sign-in on that alone */
+    }
+  }
+  return { ok: true };
+}
 
 // Create the auth context
 const AuthContext = createContext();
@@ -29,18 +56,9 @@ export const AuthProvider = ({ children }) => {
         try {
           // Get ID token for backend API calls
           const idToken = await user.getIdToken();
-          
+
           // Store token for API calls
           localStorage.setItem('token', idToken);
-          
-          // Set user data in state
-          setCurrentUser({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            emailVerified: user.emailVerified
-          });
 
           // Load the profile, redeeming any pending admin invite FIRST (the
           // invite sets role + class + subjects). We then read the canonical
@@ -66,19 +84,40 @@ export const AuthProvider = ({ children }) => {
             } catch (inviteErr) {
               /* no invite or not reachable — ignore */
             }
-            // Don't let a stale/basic read (e.g. a second auth event that fires
-            // before the redeem write has propagated) clobber an already
-            // populated profile.
-            setUserProfile((prev) => {
-              if (prev?.subjects?.length && !profile?.subjects?.length) return prev;
-              if (prev?.userType && !profile?.userType) return prev;
-              return profile;
-            });
-            if (profile?.gradeLevel) {
-              localStorage.setItem(GRADE_LEVEL_KEY, profile.gradeLevel);
-            }
           } catch (profileErr) {
             console.error('Error loading user profile:', profileErr);
+          }
+
+          // Access gate — re-checked on every load so a user deactivated
+          // mid-session is signed out on their next visit, not just at login.
+          const gate = await checkAccountAccess(profile);
+          if (!gate.ok) {
+            await firebaseService.logout();
+            localStorage.removeItem('token');
+            setError(gate.message);
+            setCurrentUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            return;
+          }
+
+          setCurrentUser({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified
+          });
+          // Don't let a stale/basic read (e.g. a second auth event that fires
+          // before the redeem write has propagated) clobber an already
+          // populated profile.
+          setUserProfile((prev) => {
+            if (prev?.subjects?.length && !profile?.subjects?.length) return prev;
+            if (prev?.userType && !profile?.userType) return prev;
+            return profile;
+          });
+          if (profile?.gradeLevel) {
+            localStorage.setItem(GRADE_LEVEL_KEY, profile.gradeLevel);
           }
         } catch (err) {
           console.error('Error getting user token:', err);
@@ -107,6 +146,23 @@ export const AuthProvider = ({ children }) => {
 
       // Use Firebase authentication directly
       const user = await firebaseService.login(email, password);
+
+      // Block deactivated accounts / suspended schools before completing
+      // sign-in — sign them straight back out with a clear message.
+      let profile = null;
+      try {
+        profile = await firebaseService.getUserProfile();
+      } catch (_) {
+        /* ignore — gate treats a missing profile as active */
+      }
+      const gate = await checkAccountAccess(profile);
+      if (!gate.ok) {
+        await firebaseService.logout();
+        localStorage.removeItem('token');
+        const denied = new Error(gate.message);
+        denied.code = 'auth/account-deactivated';
+        throw denied;
+      }
 
       try {
         // Get fresh ID token
