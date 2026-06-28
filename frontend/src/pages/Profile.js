@@ -20,12 +20,14 @@ import {
   deleteUser
 } from 'firebase/auth';
 
-// OAuth providers a user can link. LinkedIn uses Firebase's generic OpenID
-// Connect provider id 'oidc.linkedin'. Each must be enabled in the Firebase
-// console (Authentication → Sign-in method) for linking to actually work.
+// OAuth providers a user can link. Only providers with `enabled: true` are
+// shown, so users never see a "Connect" that errors. Once a provider is set up
+// in the Firebase console (Authentication → Sign-in method), flip its `enabled`
+// to true here. LinkedIn uses Firebase's generic OpenID Connect provider id
+// 'oidc.linkedin' (created as an OIDC provider named "linkedin").
 const LINK_PROVIDERS = [
   {
-    id: 'google', label: 'Google', providerId: 'google.com',
+    id: 'google', label: 'Google', providerId: 'google.com', enabled: true,
     make: () => new GoogleAuthProvider(),
     icon: (
       <svg className="w-8 h-8 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
@@ -37,7 +39,7 @@ const LINK_PROVIDERS = [
     ),
   },
   {
-    id: 'facebook', label: 'Facebook', providerId: 'facebook.com',
+    id: 'facebook', label: 'Facebook', providerId: 'facebook.com', enabled: false,
     make: () => new FacebookAuthProvider(),
     icon: (
       <svg className="w-8 h-8 text-[#1877F2]" viewBox="0 0 24 24" fill="currentColor">
@@ -46,7 +48,7 @@ const LINK_PROVIDERS = [
     ),
   },
   {
-    id: 'linkedin', label: 'LinkedIn', providerId: 'oidc.linkedin',
+    id: 'linkedin', label: 'LinkedIn', providerId: 'oidc.linkedin', enabled: false,
     make: () => new OAuthProvider('oidc.linkedin'),
     icon: (
       <svg className="w-8 h-8 text-[#0A66C2]" viewBox="0 0 24 24" fill="currentColor">
@@ -794,7 +796,7 @@ const Profile = () => {
                       )}
 
                       <div className="mt-4 space-y-4">
-                        {LINK_PROVIDERS.map((p) => {
+                        {LINK_PROVIDERS.filter((p) => p.enabled).map((p) => {
                           const connected = linkedProviders.includes(p.id);
                           const busy = linkingProvider === p.id;
                           return (
