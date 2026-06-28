@@ -14,6 +14,8 @@ import { emailService } from './emailService';
 // admin sees the whole platform; a school admin sees only their own school.
 
 const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'School Admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
+// Some llama responses wrap plain text in stray <function> tags — strip them.
+const cleanAnswer = (t) => (t || '').replace(/<\/?function[^>]*>/gi, '').trim();
 // Natural phrases people use → the canonical role value.
 const ROLE_ALIASES = {
   admin: 'admin', 'school admin': 'admin', schooladmin: 'admin', 'school administrator': 'admin', administrator: 'admin', 'school-admin': 'admin',
@@ -371,22 +373,24 @@ You can also PREPARE actions: suspend_school, reactivate_school, deactivate_acco
 }
 
 // Answer a free-text question by letting the model query the database via tools.
-export async function runPlatformAssistant({ question, viewer }) {
-  const messages = [
-    { role: 'system', content: systemPrompt(viewer) },
-    { role: 'user', content: question },
-  ];
+export async function runPlatformAssistant({ history, question, viewer }) {
+  // Accept a multi-turn conversation (preferred) or a single question.
+  const convo = (history && history.length ? history : (question ? [{ role: 'user', content: question }] : []))
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content)
+    .map((m) => ({ role: m.role, content: m.content }));
+  const messages = [{ role: 'system', content: systemPrompt(viewer) }, ...convo];
   let pendingAction = null; // an action awaiting the user's confirmation
-  // Tools get the viewer plus the exact text the user wrote this turn, so an
-  // action tool can refuse values (e.g. an email) the user never actually gave.
-  const ctx = { ...viewer, userText: question };
+  // Tools get the viewer plus everything the USER actually typed across the
+  // conversation, so an action tool can refuse values (e.g. an email) the user
+  // never gave — even if the email was provided in an earlier turn.
+  const ctx = { ...viewer, userText: convo.filter((m) => m.role === 'user').map((m) => m.content).join('\n') };
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const msg = await groqTools(messages, TOOL_DEFS, { maxTokens: 1200 });
     messages.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
 
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
-      return { answer: msg.content || 'I could not find an answer to that.', pendingAction };
+      return { answer: cleanAnswer(msg.content) || 'I could not find an answer to that.', pendingAction };
     }
 
     for (const call of msg.tool_calls) {
@@ -412,5 +416,5 @@ export async function runPlatformAssistant({ question, viewer }) {
     [],
     { maxTokens: 1000 }
   );
-  return { answer: finalMsg.content || 'I gathered some data but could not compose a final answer.', pendingAction };
+  return { answer: cleanAnswer(finalMsg.content) || 'I gathered some data but could not compose a final answer.', pendingAction };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FiZap, FiRefreshCw, FiSend, FiCheck, FiX, FiAlertTriangle } from 'react-icons/fi';
 import Card from './Card';
 import Markdown from './Markdown';
@@ -10,10 +10,10 @@ import { schoolService } from '../services/schoolService';
 import { auditService } from '../services/auditService';
 
 const SUGGESTIONS = [
+  'Give me a full summary of the platform',
   'Which schools have no teachers?',
   'Which school is the most active?',
   'Are any schools suspended or empty?',
-  'How big is the platform overall?',
 ];
 
 const ago = (ts) => {
@@ -31,14 +31,12 @@ const ago = (ts) => {
 const ROLE = { admin: 'school admin', teacher: 'teacher', student: 'student', parent: 'parent' };
 const MEMBER_CAP = 150; // safety cap so a huge platform can't blow the token budget
 
-// Turn the live platform data into a compact, factual snapshot the AI reasons
-// over. Flags are computed here (deterministic) so the AI never has to guess,
-// and the actual people in each school are listed so it can answer "who" too.
+// Turn the live platform data into a compact, factual snapshot for the opening
+// briefing. Flags are computed here (deterministic) so the AI never has to guess.
 function buildSnapshot({ stats, schools, members, admins, activity, schoolName, generatedAt, viewer }) {
   const suspended = schools.filter((s) => (s.status || 'active').toLowerCase() !== 'active').length;
   const totals = `${stats.student} students, ${stats.teacher} teachers, ${stats.admin} school admins, ${stats.parent} parents across ${schools.length} school(s) (${suspended} not active). ${stats.deactivated} account(s) deactivated. ${stats.total} active accounts in total.`;
 
-  // Group the real accounts by school (capped for very large platforms).
   const capped = (members || []).slice(0, MEMBER_CAP);
   const truncated = (members || []).length > MEMBER_CAP;
   const bySchoolMembers = {};
@@ -61,7 +59,6 @@ function buildSnapshot({ stats, schools, members, admins, activity, schoolName, 
   const orphans = bySchoolMembers.__none__ || [];
   const orphanBlock = orphans.length ? `\nNot assigned to any school:\n${orphans.map(memberLine).join('\n')}` : '';
 
-  // Platform super administrators (no school) — so "everyone" includes them.
   const adminLines = (admins || [])
     .map((a) => `  - ${a.displayName || 'Unnamed'} <${a.email || 'no email on file'}> — super administrator (${(a.status || 'active').toLowerCase()})`)
     .join('\n');
@@ -86,7 +83,7 @@ function buildSnapshot({ stats, schools, members, admins, activity, schoolName, 
     .join('\n');
 
   const viewerLine = viewer
-    ? `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the platform super administrator who is asking these questions. When they say "me", "I" or "my", they mean this account, and they are one of the platform super administrators listed below.\n\n`
+    ? `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the platform super administrator. When they say "me", "I" or "my", they mean this account.\n\n`
     : '';
 
   return `PLATFORM SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
@@ -102,18 +99,18 @@ Recent activity (newest first):
 ${activityLines || '(no recent activity recorded)'}`;
 }
 
+let _mid = 0;
+const nextId = () => `m${(_mid += 1)}`;
+
 const PlatformInsights = () => {
   const { currentUser, userProfile } = useAuth();
-  const [snapshot, setSnapshot] = useState('');
-  const [briefing, setBriefing] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [messages, setMessages] = useState([]); // { id, role, content, error?, pendingAction?, actionResult? }
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(true); // initial briefing
   const [asking, setAsking] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // action awaiting confirm
-  const [executing, setExecuting] = useState(false);
-  const [actionResult, setActionResult] = useState(null); // { ok, text } after running
+  const [error, setError] = useState('');
+  const [executingId, setExecutingId] = useState('');
+  const threadRef = useRef(null);
 
   const viewer = useMemo(() => ({
     role: userProfile?.userType || 'superadmin',
@@ -124,10 +121,10 @@ const PlatformInsights = () => {
     uid: currentUser?.uid || '',
   }), [currentUser, userProfile]);
 
-  const load = useCallback(async () => {
+  // Opening briefing — also starts a fresh conversation.
+  const startConversation = useCallback(async () => {
     setLoading(true);
     setError('');
-    setAnswer('');
     try {
       const [stats, schools, members, admins, activity] = await Promise.all([
         accountService.platformStats(),
@@ -139,179 +136,174 @@ const PlatformInsights = () => {
       const schoolName = {};
       schools.forEach((s) => { schoolName[s.id] = s.name; });
       const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-      const viewer = {
-        name: currentUser?.displayName || userProfile?.displayName || currentUser?.email || 'the administrator',
-        email: currentUser?.email || '',
-        uid: currentUser?.uid || '',
-      };
       const snap = buildSnapshot({ stats, schools, members, admins, activity, schoolName, generatedAt, viewer });
-      setSnapshot(snap);
       const text = await aiInsights.platformBriefing({ snapshot: snap });
-      setBriefing(text);
+      setMessages([{ id: 'briefing', role: 'assistant', content: text }]);
     } catch (err) {
       console.error('Platform insights failed:', err);
       setError(err.message || 'Could not generate insights right now.');
+      setMessages([]);
     } finally {
       setLoading(false);
     }
-  }, [currentUser, userProfile]);
+  // viewer only changes on login; safe to depend on it.
+  }, [viewer]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { startConversation(); }, [startConversation]);
 
-  const ask = async (q) => {
-    const query = (q ?? question).trim();
-    if (!query || asking) return;
-    setQuestion(query);
+  // Keep the thread scrolled to the newest message.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, asking]);
+
+  const send = async (q) => {
+    const text = (q ?? input).trim();
+    if (!text || asking || loading) return;
+    setInput('');
+    const userMsg = { id: nextId(), role: 'user', content: text };
+    const withUser = [...messages, userMsg];
+    setMessages(withUser);
     setAsking(true);
-    setAnswer('');
-    setError('');
-    setPendingAction(null);
-    setActionResult(null);
     try {
-      // The agent queries the database on demand via tools, scoped to who's
-      // asking. Action requests come back as a pendingAction to confirm.
-      const { answer: text, pendingAction: pa } = await runPlatformAssistant({ question: query, viewer });
-      setAnswer(text);
-      setPendingAction(pa || null);
+      // Pass the whole conversation (minus the briefing) so the AI has context
+      // for follow-ups like "the email is stella@x.com".
+      const history = withUser
+        .filter((m) => m.id !== 'briefing' && (m.role === 'user' || m.role === 'assistant') && m.content)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const { answer, pendingAction } = await runPlatformAssistant({ history, viewer });
+      setMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: answer, pendingAction: pendingAction || null }]);
     } catch (err) {
       console.error('Platform ask failed:', err);
-      setError(err.message || 'Could not answer that right now.');
+      setMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: '', error: err.message || 'Could not answer that right now.' }]);
     } finally {
       setAsking(false);
     }
   };
 
-  const confirmAction = async () => {
-    if (!pendingAction || executing) return;
-    setExecuting(true);
-    setError('');
+  const confirmAction = async (msg) => {
+    if (!msg.pendingAction || executingId) return;
+    setExecutingId(msg.id);
     try {
-      const msg = await executeAction(pendingAction, viewer);
-      setActionResult({ ok: true, text: msg });
-      setPendingAction(null);
-      load(); // refresh the briefing now the platform changed
+      const result = await executeAction(msg.pendingAction, viewer);
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, pendingAction: null, actionResult: { ok: true, text: result } } : m)));
     } catch (err) {
       console.error('Action failed:', err);
-      setActionResult({ ok: false, text: err?.code === 'permission-denied' ? 'Permission denied — the latest security rules may not be published yet.' : (err.message || 'Could not complete that action.') });
+      const text = err?.code === 'permission-denied' ? 'Permission denied — the latest security rules may not be published yet.' : (err.message || 'Could not complete that action.');
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, actionResult: { ok: false, text } } : m)));
     } finally {
-      setExecuting(false);
+      setExecutingId('');
     }
   };
 
+  const cancelAction = (msg) => {
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, pendingAction: null, actionResult: { ok: true, text: 'Cancelled — nothing was changed.' } } : m)));
+  };
+
+  const showSuggestions = !loading && messages.filter((m) => m.role === 'user').length === 0;
+
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-0 overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
             <FiZap className="w-4 h-4" />
           </span>
           <div>
-            <h2 className="font-bold text-gray-900 leading-tight">Platform Insights</h2>
-            <p className="text-xs text-gray-400">AI summary of your whole platform</p>
+            <h2 className="font-bold text-gray-900 leading-tight">Assistant</h2>
+            <p className="text-xs text-gray-400">Ask about your platform, or tell me to do something</p>
           </div>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          title="Refresh"
-          className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-        >
+        <button onClick={startConversation} disabled={loading} title="New conversation"
+          className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50">
           <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {loading ? (
-        <div className="animate-pulse space-y-2 py-2">
-          <div className="h-3 bg-gray-100 rounded w-1/3" />
-          <div className="h-3 bg-gray-100 rounded w-full" />
-          <div className="h-3 bg-gray-100 rounded w-5/6" />
-          <div className="h-3 bg-gray-100 rounded w-2/3" />
-          <p className="text-xs text-gray-400 pt-1">Analysing your platform…</p>
-        </div>
-      ) : error && !briefing ? (
-        <div className="text-sm text-gray-600">
-          <p className="text-red-600 mb-2">{error}</p>
-          <button onClick={load} className="text-primary-600 hover:underline text-sm">Try again</button>
-        </div>
-      ) : (
-        <Markdown content={briefing} />
-      )}
+      {/* Conversation thread */}
+      <div ref={threadRef} className="px-4 py-4 space-y-3 overflow-y-auto" style={{ maxHeight: '60vh', minHeight: '240px' }}>
+        {loading ? (
+          <div className="animate-pulse space-y-2 py-2">
+            <div className="h-3 bg-gray-100 rounded w-1/3" />
+            <div className="h-3 bg-gray-100 rounded w-full" />
+            <div className="h-3 bg-gray-100 rounded w-5/6" />
+            <p className="text-xs text-gray-400 pt-1">Analysing your platform…</p>
+          </div>
+        ) : error && messages.length === 0 ? (
+          <div className="text-sm">
+            <p className="text-red-600 mb-2">{error}</p>
+            <button onClick={startConversation} className="text-primary-600 hover:underline">Try again</button>
+          </div>
+        ) : (
+          messages.map((m) => (
+            <div key={m.id} className={m.role === 'user' ? 'flex justify-end' : ''}>
+              {m.role === 'user' ? (
+                <div className="max-w-[85%] bg-primary-600 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm whitespace-pre-wrap">{m.content}</div>
+              ) : (
+                <div className="max-w-[92%]">
+                  <div className="bg-gray-50 rounded-2xl rounded-bl-sm px-3.5 py-2.5">
+                    {m.error ? <p className="text-sm text-red-600">{m.error}</p> : <Markdown content={m.content} />}
+                  </div>
 
-      {/* Ask anything */}
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => ask(s)}
-              disabled={asking || loading}
-              className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <form
-          onSubmit={(e) => { e.preventDefault(); ask(); }}
-          className="flex items-center gap-2"
-        >
+                  {m.pendingAction && (
+                    <div className={`mt-2 rounded-lg p-3 border ${m.pendingAction.danger ? 'border-red-200 bg-red-50' : 'border-primary-200 bg-primary-50'}`}>
+                      <div className="flex items-start gap-2">
+                        <FiAlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${m.pendingAction.danger ? 'text-red-500' : 'text-primary-600'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900">{m.pendingAction.summary}</p>
+                          {m.pendingAction.impact && <p className="text-xs text-gray-600 mt-0.5">{m.pendingAction.impact}.</p>}
+                          <div className="flex items-center gap-2 mt-3">
+                            <button onClick={() => confirmAction(m)} disabled={executingId === m.id}
+                              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-60 ${m.pendingAction.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'}`}>
+                              <FiCheck className="w-4 h-4" /> {executingId === m.id ? 'Working…' : (m.pendingAction.confirmLabel || 'Confirm')}
+                            </button>
+                            <button onClick={() => cancelAction(m)} disabled={executingId === m.id}
+                              className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-60">
+                              <FiX className="w-4 h-4" /> Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {m.actionResult && (
+                    <p className={`text-sm mt-1.5 ${m.actionResult.ok ? 'text-green-700' : 'text-red-600'}`}>{m.actionResult.text}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+        {asking && <p className="text-xs text-gray-400">Thinking…</p>}
+      </div>
+
+      {/* Suggestions (first turn only) + the message box */}
+      <div className="px-4 py-3 border-t border-gray-100">
+        {showSuggestions && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {SUGGESTIONS.map((s) => (
+              <button key={s} onClick={() => send(s)} disabled={asking}
+                className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-center gap-2">
           <input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask anything about your platform…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Message the assistant…"
             disabled={loading}
             className="flex-1 px-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
           />
-          <button
-            type="submit"
-            disabled={asking || loading || !question.trim()}
-            className="p-2.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
-            aria-label="Ask"
-          >
+          <button type="submit" disabled={asking || loading || !input.trim()}
+            className="p-2.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50" aria-label="Send">
             <FiSend className="w-4 h-4" />
           </button>
         </form>
-
-        {asking && <p className="text-xs text-gray-400 mt-2">Thinking…</p>}
-        {answer && !asking && (
-          <div className="mt-3 bg-gray-50 rounded-lg p-3">
-            <Markdown content={answer} />
-          </div>
-        )}
-
-        {/* Confirm-before-acting card */}
-        {pendingAction && !asking && (
-          <div className={`mt-3 rounded-lg p-3 border ${pendingAction.danger ? 'border-red-200 bg-red-50' : 'border-primary-200 bg-primary-50'}`}>
-            <div className="flex items-start gap-2">
-              <FiAlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${pendingAction.danger ? 'text-red-500' : 'text-primary-600'}`} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900">{pendingAction.summary}</p>
-                {pendingAction.impact && <p className="text-xs text-gray-600 mt-0.5">{pendingAction.impact}.</p>}
-                <div className="flex items-center gap-2 mt-3">
-                  <button
-                    onClick={confirmAction}
-                    disabled={executing}
-                    className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-white disabled:opacity-60 ${pendingAction.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'}`}
-                  >
-                    <FiCheck className="w-4 h-4" /> {executing ? 'Working…' : (pendingAction.confirmLabel || 'Confirm')}
-                  </button>
-                  <button
-                    onClick={() => { setPendingAction(null); setActionResult({ ok: true, text: 'Cancelled — nothing was changed.' }); }}
-                    disabled={executing}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-60"
-                  >
-                    <FiX className="w-4 h-4" /> Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {actionResult && (
-          <p className={`text-sm mt-2 ${actionResult.ok ? 'text-green-700' : 'text-red-600'}`}>{actionResult.text}</p>
-        )}
-        {error && briefing && <p className="text-sm text-red-600 mt-2">{error}</p>}
       </div>
     </Card>
   );
