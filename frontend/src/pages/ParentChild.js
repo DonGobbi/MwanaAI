@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { classService } from '../services/classService';
 import { quizService } from '../services/quizService';
+import { assignmentService } from '../services/assignmentService';
 import { aiInsights } from '../services/aiInsightsService';
 import { analyzeResults } from '../services/studentIntel';
 import { getGradeLevel } from '../config/curriculum';
 import { printStudentReport } from '../utils/printReport';
 import Markdown from '../components/Markdown';
 import Spinner from '../components/Spinner';
-import { FiPrinter, FiZap } from 'react-icons/fi';
+import { FiPrinter, FiZap, FiAlertTriangle, FiClipboard } from 'react-icons/fi';
 
 const STORAGE_KEY = 'mwanaai_child_email';
 
@@ -16,6 +17,7 @@ const ParentChild = () => {
   const [child, setChild] = useState(null);
   const [summary, setSummary] = useState(null);
   const [results, setResults] = useState([]);
+  const [tasks, setTasks] = useState([]); // upcoming assessments not yet done
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,6 +36,7 @@ const ParentChild = () => {
     setChild(null);
     setSummary(null);
     setResults([]);
+    setTasks([]);
     setAiNote('');
     try {
       const found = await classService.findStudentByEmail(target);
@@ -49,6 +52,19 @@ const ParentChild = () => {
       ]);
       setSummary(sum);
       setResults(all);
+
+      // Upcoming assessments: assignments in the child's classes not yet done.
+      try {
+        const classes = await classService.listClassesForStudent(found.uid);
+        const classIds = classes.map((c) => c.classId);
+        const [assignments, completed] = await Promise.all([
+          assignmentService.listForStudent(classIds),
+          assignmentService.completedByStudent(found.uid),
+        ]);
+        setTasks(assignments.filter((a) => !completed.has(a.id)));
+      } catch (taskErr) {
+        /* non-critical */
+      }
     } catch (err) {
       setError(err.message || 'Could not load progress. Please try again.');
     } finally {
@@ -83,6 +99,10 @@ const ParentChild = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const intel = analyzeResults(results);
+  const declining = (intel.bySubject || []).filter((s) => s.trend === 'down');
+  const firstName = (child?.displayName || 'Your child').split(' ')[0];
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -158,6 +178,26 @@ const ParentChild = () => {
               </div>
             </div>
 
+            {/* Alert: recent scores slipping in one or more subjects */}
+            {declining.length > 0 && (
+              <div className="mb-5 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg animate-fade-in">
+                <div className="flex items-start gap-2">
+                  <FiAlertTriangle className="text-amber-500 w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-amber-800">
+                      {firstName}'s scores are slipping in {declining.length === 1 ? 'a subject' : `${declining.length} subjects`}
+                    </p>
+                    <ul className="text-sm text-amber-700 mt-1 space-y-0.5">
+                      {declining.map((s) => (
+                        <li key={s.subject}>• {s.label}: recent {s.recentAvg}% (was {s.avg}% overall)</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-amber-600 mt-1">A little encouragement and practice at home can help turn this around.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI parent summary — plain language, with how to help at home */}
             <div className="card p-5 mb-5">
               <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -180,6 +220,29 @@ const ParentChild = () => {
                 </p>
               )}
             </div>
+
+            {tasks.length > 0 && (
+              <>
+                <h2 className="text-lg font-bold text-gray-900 mb-2">Upcoming assessments</h2>
+                <p className="text-sm text-gray-500 mb-2">Tasks {firstName} hasn't done yet — a good chance to encourage them.</p>
+                <div className="card divide-y divide-gray-100 mb-5">
+                  {tasks.slice(0, 10).map((a) => (
+                    <div key={a.id} className="flex justify-between items-center px-4 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FiClipboard className="text-primary-600 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{a.title || a.subjectLabel}</p>
+                          <p className="text-xs text-gray-400">
+                            {a.className}{a.examType ? ` · ${a.examType}` : ''} · {a.count} questions
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex-shrink-0">To do</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {summary.recent.length > 0 && (
               <>
