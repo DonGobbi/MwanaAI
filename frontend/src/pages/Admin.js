@@ -104,7 +104,7 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
   const [busyId, setBusyId] = useState('');
   const [openId, setOpenId] = useState('');
   const [note, setNote] = useState({}); // uid -> transient message
-  const [confirmUser, setConfirmUser] = useState(null); // member pending deactivation
+  const [confirmAction, setConfirmAction] = useState(null); // { user, status } pending confirmation
 
   const load = useCallback(async () => {
     try {
@@ -176,13 +176,13 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
                 <FiKey className="w-3.5 h-3.5" /> Reset password
               </button>
               {canDeactivate && (deactivated ? (
-                <button disabled={busyId === u.uid} onClick={() => changeStatus(u, 'active')}
+                <button disabled={busyId === u.uid} onClick={() => setConfirmAction({ user: u, status: 'active' })}
                   className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
                   <FiRefreshCw className="w-3.5 h-3.5" /> Reactivate
                 </button>
               ) : (
                 <button disabled={busyId === u.uid}
-                  onClick={() => setConfirmUser(u)}
+                  onClick={() => setConfirmAction({ user: u, status: 'deactivated' })}
                   className="text-xs text-red-600 hover:underline inline-flex items-center gap-1 flex-shrink-0 disabled:opacity-50">
                   <FiSlash className="w-3.5 h-3.5" /> Deactivate
                 </button>
@@ -202,14 +202,16 @@ const MembersList = ({ school, role, actorUid, canDeactivate }) => {
       })}
     </ul>
     <ConfirmDialog
-      open={!!confirmUser}
-      tone="danger"
-      title={`Deactivate ${confirmUser?.displayName || confirmUser?.email || 'this account'}?`}
-      message="They won't be able to sign in until you reactivate them. Their data is kept."
-      confirmLabel="Deactivate"
-      busy={!!confirmUser && busyId === confirmUser.uid}
-      onCancel={() => setConfirmUser(null)}
-      onConfirm={async () => { const u = confirmUser; await changeStatus(u, 'deactivated'); setConfirmUser(null); }}
+      open={!!confirmAction}
+      tone={confirmAction?.status === 'active' ? 'primary' : 'danger'}
+      title={`${confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'} ${confirmAction?.user?.displayName || confirmAction?.user?.email || 'this account'}?`}
+      message={confirmAction?.status === 'active'
+        ? "They'll be able to sign in again straight away."
+        : "They won't be able to sign in until you reactivate them. Their data is kept."}
+      confirmLabel={confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'}
+      busy={!!confirmAction && busyId === confirmAction.user.uid}
+      onCancel={() => setConfirmAction(null)}
+      onConfirm={async () => { const { user, status } = confirmAction; await changeStatus(user, status); setConfirmAction(null); }}
     />
     </>
   );
