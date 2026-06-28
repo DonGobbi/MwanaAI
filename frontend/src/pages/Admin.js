@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { schoolService } from '../services/schoolService';
 import { inviteService } from '../services/inviteService';
@@ -1221,8 +1221,7 @@ const SubjectsManager = ({ school, actor }) => {
 };
 
 // ---- Manage one school: admins, teachers, students, parents ----
-const ManageSchool = ({ school, admin, isSuper, onBack }) => {
-  const [tab, setTab] = useState('overview');
+const ManageSchool = ({ school, admin, isSuper, tab, onTab, onBack }) => {
   const [name, setName] = useState(school.name);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -1266,6 +1265,8 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
     { id: 'history', label: 'History', icon: FiClock },
     ...(isSuper ? [{ id: 'settings', label: 'Settings', icon: FiSettings }] : []),
   ];
+  // The URL drives the active tab; fall back to overview for an unknown one.
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'overview';
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -1286,18 +1287,18 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
         {/* Tabs */}
         <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => onTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                tab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+                activeTab === t.id ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}>
               <t.icon className="w-4 h-4" /> {t.label}
             </button>
           ))}
         </div>
 
-        {tab === 'overview' && <Overview school={school} isSuper={isSuper} onGo={setTab} />}
+        {activeTab === 'overview' && <Overview school={school} isSuper={isSuper} onGo={onTab} />}
 
-        {tab === 'admins' && (
+        {activeTab === 'admins' && (
           <PeopleSection school={school} role="admin" actor={admin} canDeactivate={isSuper}
             accountsTitle="School admin accounts" icon={FiShield}
             inviteUI={
@@ -1307,7 +1308,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
             } />
         )}
 
-        {tab === 'teachers' && (
+        {activeTab === 'teachers' && (
           <PeopleSection school={school} role="teacher" actor={admin} canDeactivate
             accountsTitle="Teacher accounts" icon={FiUserCheck}
             inviteUI={
@@ -1317,13 +1318,13 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
             } />
         )}
 
-        {tab === 'students' && (
+        {activeTab === 'students' && (
           <PeopleSection school={school} role="student" actor={admin} canDeactivate
             accountsTitle="Student accounts" icon={FiUsers}
             inviteUI={<StudentInvites school={school} admin={admin} />} />
         )}
 
-        {tab === 'parents' && (
+        {activeTab === 'parents' && (
           <PeopleSection school={school} role="parent" actor={admin} canDeactivate
             accountsTitle="Parent accounts" icon={FiUsers}
             inviteUI={
@@ -1333,11 +1334,11 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
             } />
         )}
 
-        {tab === 'subjects' && <SubjectsManager school={school} actor={admin} />}
+        {activeTab === 'subjects' && <SubjectsManager school={school} actor={admin} />}
 
-        {tab === 'history' && <AuditLog school={school} />}
+        {activeTab === 'history' && <AuditLog school={school} />}
 
-        {tab === 'settings' && isSuper && (
+        {activeTab === 'settings' && isSuper && (
           <div className="space-y-6">
             <div className="card p-5">
               <div className="flex items-center gap-2 mb-1"><FiHome className="text-primary-600" /><h2 className="font-bold text-gray-900">School name</h2></div>
@@ -1404,62 +1405,114 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
   );
 };
 
-const Admin = () => {
-  const { currentUser, userProfile } = useAuth();
-  const isSuper = userProfile?.userType === 'superadmin';
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [adminSchool, setAdminSchool] = useState(null);
+// Loads a school by the :schoolId in the URL and renders ManageSchool with the
+// :tab from the URL. A School Admin is kept inside their own school.
+const ManageSchoolRoute = ({ admin, isSuper, userProfile }) => {
+  const { schoolId, tab } = useParams();
+  const navigate = useNavigate();
+  const [school, setSchool] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     (async () => {
       try {
-        // School Admin loads their assigned school; Super Admin uses the list.
-        if (userProfile && userProfile.userType === 'admin') {
-          const s = await schoolService.getSchool(userProfile.schoolId);
-          if (active) setAdminSchool(s);
-        }
+        const s = await schoolService.getSchool(schoolId);
+        if (active) setSchool(s);
       } catch (err) {
-        console.error('Could not load school:', err);
+        if (active) setSchool(null);
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
-  }, [userProfile]);
+  }, [schoolId]);
 
-  // Only Super Admins and School Admins may see this page.
-  if (userProfile && userProfile.userType !== 'superadmin' && userProfile.userType !== 'admin') {
-    return <Navigate to="/" replace />;
+  // A School Admin can only manage their own school.
+  if (!isSuper && userProfile?.schoolId && schoolId !== userProfile.schoolId) {
+    return <Navigate to={`/admin/schools/${userProfile.schoolId}/overview`} replace />;
   }
+
   if (loading) {
     return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-5xl"><PageLoader /></div></div>;
   }
-
-  // ---- School Admin → straight into their school ----
-  if (!isSuper) {
-    if (!adminSchool) {
-      return (
-        <div className="bg-gray-50 min-h-screen">
-          <div className="container py-10 max-w-2xl text-center">
-            <div className="card p-8">
-              <FiShield className="w-8 h-8 text-primary-600 mx-auto mb-3" />
-              <h1 className="text-xl font-bold text-gray-900 mb-1">No school assigned yet</h1>
-              <p className="text-sm text-gray-500">Ask your Super Admin to add you to a school, then sign in again.</p>
-            </div>
+  if (!school) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container py-10 max-w-2xl text-center">
+          <div className="card p-8">
+            <FiHome className="w-8 h-8 text-primary-600 mx-auto mb-3" />
+            <h1 className="text-xl font-bold text-gray-900 mb-1">School not found</h1>
+            <p className="text-sm text-gray-500 mb-4">This school may have been removed.</p>
+            {isSuper && <button onClick={() => navigate('/admin')} className="text-sm text-primary-600 hover:underline">← Back to schools</button>}
           </div>
         </div>
-      );
-    }
-    return <ManageSchool school={adminSchool} admin={currentUser} isSuper={false} />;
+      </div>
+    );
   }
+  return (
+    <ManageSchool
+      school={school}
+      admin={admin}
+      isSuper={isSuper}
+      tab={tab}
+      onTab={(t) => navigate(`/admin/schools/${schoolId}/${t}`)}
+      onBack={() => navigate('/admin')}
+    />
+  );
+};
 
-  // ---- Super Admin → schools list, or one selected school ----
-  if (selectedSchool) {
-    return <ManageSchool school={selectedSchool} admin={currentUser} isSuper onBack={() => setSelectedSchool(null)} />;
+// /admin/schools/:schoolId (no tab) → land on the Overview tab.
+const SchoolOverviewRedirect = () => {
+  const { schoolId } = useParams();
+  return <Navigate to={`/admin/schools/${schoolId}/overview`} replace />;
+};
+
+const NoSchoolAssigned = () => (
+  <div className="bg-gray-50 min-h-screen">
+    <div className="container py-10 max-w-2xl text-center">
+      <div className="card p-8">
+        <FiShield className="w-8 h-8 text-primary-600 mx-auto mb-3" />
+        <h1 className="text-xl font-bold text-gray-900 mb-1">No school assigned yet</h1>
+        <p className="text-sm text-gray-500">Ask your Super Admin to add you to a school, then sign in again.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const Admin = () => {
+  const { currentUser, userProfile } = useAuth();
+  const navigate = useNavigate();
+
+  if (!userProfile) {
+    return <div className="bg-gray-50 min-h-screen"><div className="container py-8 max-w-5xl"><PageLoader /></div></div>;
   }
-  return <SchoolsList admin={currentUser} onOpen={setSelectedSchool} />;
+  // Only Super Admins and School Admins may see this page.
+  if (userProfile.userType !== 'superadmin' && userProfile.userType !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  const isSuper = userProfile.userType === 'superadmin';
+
+  return (
+    <Routes>
+      <Route
+        index
+        element={
+          isSuper ? (
+            <SchoolsList admin={currentUser} onOpen={(s) => navigate(`/admin/schools/${s.id}/overview`)} />
+          ) : userProfile.schoolId ? (
+            <Navigate to={`/admin/schools/${userProfile.schoolId}/overview`} replace />
+          ) : (
+            <NoSchoolAssigned />
+          )
+        }
+      />
+      <Route path="schools/:schoolId" element={<SchoolOverviewRedirect />} />
+      <Route path="schools/:schoolId/:tab" element={<ManageSchoolRoute admin={currentUser} isSuper={isSuper} userProfile={userProfile} />} />
+      <Route path="*" element={<Navigate to="/admin" replace />} />
+    </Routes>
+  );
 };
 
 export default Admin;

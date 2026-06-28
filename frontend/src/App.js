@@ -55,7 +55,7 @@ const RoutesTree = ({ location }) => (
     <Route path="/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
     <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
     <Route path="/teacher" element={<ProtectedRoute><Teacher /></ProtectedRoute>} />
-    <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+    <Route path="/admin/*" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     <Route path="/child" element={<ProtectedRoute><ParentChild /></ProtectedRoute>} />
     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/" replace />} />
