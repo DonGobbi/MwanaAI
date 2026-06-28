@@ -15,7 +15,7 @@ import ActionMenu from '../components/ActionMenu';
 import {
   FiHome, FiBookOpen, FiGrid, FiUsers, FiUserCheck, FiMail, FiCopy, FiX, FiSend,
   FiCheckCircle, FiArrowRight, FiSettings, FiShield, FiPlus, FiKey, FiSlash, FiRefreshCw,
-  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock,
+  FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiClock, FiArchive,
 } from 'react-icons/fi';
 
 // Turns the result of emailService.sendInvite into a short admin-facing note.
@@ -166,9 +166,23 @@ const InviteList = ({ invites, schoolName, onRemove }) => {
   );
 };
 
-// Actual enrolled accounts for one role: see details, reset password, and
-// (de)activate. School Admins may toggle teacher/student/parent accounts in
-// their school; only a Super Admin may toggle other admins (canDeactivate).
+// Lifecycle actions a member row can trigger (kind → target status + copy).
+const STATUS_ACTIONS = {
+  deactivate: { status: 'deactivated', tone: 'danger', verb: 'Deactivate', audit: 'Deactivated account', message: "They won't be able to sign in until you reactivate them. Their data is kept." },
+  reactivate: { status: 'active', tone: 'primary', verb: 'Reactivate', audit: 'Reactivated account', message: "They'll be able to sign in again straight away." },
+  archive: { status: 'archived', tone: 'danger', verb: 'Archive', audit: 'Archived account', message: "They'll be moved to the archive and won't be able to sign in. You can restore them here within 45 days." },
+  restore: { status: 'active', tone: 'primary', verb: 'Restore', audit: 'Restored account', message: "They'll be moved back to active and can sign in again." },
+};
+
+const ARCHIVE_RETENTION_DAYS = 45;
+const daysLeftInArchive = (archivedAt) => {
+  if (!archivedAt) return null;
+  return Math.max(0, ARCHIVE_RETENTION_DAYS - Math.floor((Date.now() - archivedAt) / 86400000));
+};
+
+// Actual enrolled accounts for one role: see details, reset password,
+// (de)activate, and archive. School Admins may manage teacher/student/parent
+// accounts in their school; only a Super Admin may manage other admins.
 const MEMBERS_PAGE_SIZE = 10;
 
 const MembersList = ({ school, role, actor, canDeactivate }) => {
@@ -199,15 +213,13 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
     setTimeout(() => setNote((p) => { const n = { ...p }; delete n[uid]; return n; }), 2500);
   };
 
-  const ACTION_LABELS = { active: 'Reactivated account', deactivated: 'Deactivated account', archived: 'Archived account' };
-
-  const changeStatus = async (u, status) => {
+  const changeStatus = async (u, status, auditAction) => {
     setBusyId(u.uid);
     try {
       await accountService.setStatus(u.uid, status, actor?.uid);
-      setMembers((p) => p.map((m) => (m.uid === u.uid ? { ...m, status } : m)));
+      setMembers((p) => p.map((m) => (m.uid === u.uid ? { ...m, status, ...(status === 'archived' ? { archivedAt: Date.now() } : {}) } : m)));
       auditService.log({
-        schoolId: school.id, actor, action: ACTION_LABELS[status] || `Set status: ${status}`,
+        schoolId: school.id, actor, action: auditAction || `Set status: ${status}`,
         targetType: role, targetId: u.uid, targetName: u.displayName || u.email,
       });
     } catch (err) {
@@ -234,18 +246,26 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
     }
   };
 
-  const activeCount = useMemo(
-    () => members.filter((u) => (u.status || 'active').toLowerCase() === 'active').length,
-    [members],
-  );
-  const offCount = members.length - activeCount;
+  const counts = useMemo(() => {
+    let active = 0, deactivated = 0, archived = 0;
+    members.forEach((u) => {
+      const st = (u.status || 'active').toLowerCase();
+      if (st === 'archived') archived += 1;
+      else if (st === 'deactivated') deactivated += 1;
+      else active += 1;
+    });
+    return { active, deactivated, archived, nonArchived: active + deactivated };
+  }, [members]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return members.filter((u) => {
       const st = (u.status || 'active').toLowerCase();
+      // Archived accounts are hidden from every view except the Archived filter.
+      if (statusFilter === 'all' && st === 'archived') return false;
       if (statusFilter === 'active' && st !== 'active') return false;
-      if (statusFilter === 'deactivated' && st === 'active') return false;
+      if (statusFilter === 'deactivated' && st !== 'deactivated') return false;
+      if (statusFilter === 'archived' && st !== 'archived') return false;
       if (!q) return true;
       return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
     });
@@ -280,9 +300,10 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
         >
-          <option value="all">All ({members.length})</option>
-          <option value="active">Active ({activeCount})</option>
-          <option value="deactivated">Deactivated ({offCount})</option>
+          <option value="all">All ({counts.nonArchived})</option>
+          <option value="active">Active ({counts.active})</option>
+          <option value="deactivated">Deactivated ({counts.deactivated})</option>
+          <option value="archived">Archived ({counts.archived})</option>
         </select>
       </div>
 
@@ -294,8 +315,8 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
             const status = (u.status || 'active').toLowerCase();
             const open = openId === u.uid;
             const age = calculateAge(u.dateOfBirth);
-            const deactivated = status === 'deactivated' || status === 'archived';
             const initials = (u.displayName || u.email || 'U').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
+            const daysLeft = status === 'archived' ? daysLeftInArchive(u.archivedAt) : null;
             return (
               <li key={u.uid} className="py-2.5">
                 <div className="flex items-center gap-3">
@@ -303,15 +324,21 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-800 truncate">{u.displayName || u.email}</p>
                     <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                    {status === 'archived' && (
+                      <p className="text-xs text-amber-600">
+                        Archived{u.archivedAt ? ` ${new Date(u.archivedAt).toLocaleDateString()}` : ''}{daysLeft != null ? ` · deletes in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : ''}
+                      </p>
+                    )}
                   </div>
                   <AccountStatusBadge status={status} />
                   <ActionMenu
                     items={[
                       { label: open ? 'Hide details' : 'View details', icon: <FiEye className="w-4 h-4" />, onClick: () => setOpenId(open ? '' : u.uid) },
-                      { label: 'Send password reset', icon: <FiKey className="w-4 h-4" />, onClick: () => sendReset(u) },
-                      canDeactivate && (deactivated
-                        ? { label: 'Reactivate account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, status: 'active' }) }
-                        : { label: 'Deactivate account', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmAction({ user: u, status: 'deactivated' }) }),
+                      status !== 'archived' && { label: 'Send password reset', icon: <FiKey className="w-4 h-4" />, onClick: () => sendReset(u) },
+                      canDeactivate && status === 'active' && { label: 'Deactivate account', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmAction({ user: u, kind: 'deactivate' }) },
+                      canDeactivate && status === 'deactivated' && { label: 'Reactivate account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, kind: 'reactivate' }) },
+                      canDeactivate && status !== 'archived' && { label: 'Archive account', icon: <FiArchive className="w-4 h-4" />, tone: 'danger', onClick: () => setConfirmAction({ user: u, kind: 'archive' }) },
+                      canDeactivate && status === 'archived' && { label: 'Restore account', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => setConfirmAction({ user: u, kind: 'restore' }) },
                     ]}
                   />
                 </div>
@@ -356,15 +383,18 @@ const MembersList = ({ school, role, actor, canDeactivate }) => {
 
       <ConfirmDialog
         open={!!confirmAction}
-        tone={confirmAction?.status === 'active' ? 'primary' : 'danger'}
-        title={`${confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'} ${confirmAction?.user?.displayName || confirmAction?.user?.email || 'this account'}?`}
-        message={confirmAction?.status === 'active'
-          ? "They'll be able to sign in again straight away."
-          : "They won't be able to sign in until you reactivate them. Their data is kept."}
-        confirmLabel={confirmAction?.status === 'active' ? 'Reactivate' : 'Deactivate'}
+        tone={confirmAction ? STATUS_ACTIONS[confirmAction.kind].tone : 'danger'}
+        title={confirmAction ? `${STATUS_ACTIONS[confirmAction.kind].verb} ${confirmAction.user.displayName || confirmAction.user.email || 'this account'}?` : ''}
+        message={confirmAction ? STATUS_ACTIONS[confirmAction.kind].message : ''}
+        confirmLabel={confirmAction ? STATUS_ACTIONS[confirmAction.kind].verb : ''}
         busy={!!confirmAction && busyId === confirmAction.user.uid}
         onCancel={() => setConfirmAction(null)}
-        onConfirm={async () => { const { user, status } = confirmAction; await changeStatus(user, status); setConfirmAction(null); }}
+        onConfirm={async () => {
+          const { user, kind } = confirmAction;
+          const cfg = STATUS_ACTIONS[kind];
+          await changeStatus(user, cfg.status, cfg.audit);
+          setConfirmAction(null);
+        }}
       />
     </div>
   );
