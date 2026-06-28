@@ -170,6 +170,18 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid;
     }
 
+    // Subjects — per-school catalogue. Readable by any signed-in user (subject
+    // pickers); a Super Admin or the school's own School Admin can add and
+    // (de)activate. No delete — subjects are deactivated, not removed.
+    match /subjects/{id} {
+      allow read: if signedIn();
+      allow create: if request.resource.data.get('schoolId', '') != ''
+        && (isSuperadmin()
+            || (isSchoolAdmin() && request.resource.data.schoolId == myUser().get('schoolId', '')));
+      allow update: if isSuperadmin()
+        || (isSchoolAdmin() && resource.data.get('schoolId', '') == myUser().get('schoolId', ''));
+    }
+
     // Learning goals — private to the student who created them (query by userId).
     match /goals/{id} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;

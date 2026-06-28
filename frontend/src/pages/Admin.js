@@ -6,6 +6,7 @@ import { inviteService } from '../services/inviteService';
 import { emailService } from '../services/emailService';
 import { accountService } from '../services/accountService';
 import { auditService } from '../services/auditService';
+import { subjectService } from '../services/subjectService';
 import firebaseService from '../services/firebaseService';
 import { GRADE_LEVELS, SUBJECTS, getGradeLevel } from '../config/curriculum';
 import { calculateAge } from '../utils/age';
@@ -1032,6 +1033,191 @@ const AuditLog = ({ school }) => {
   );
 };
 
+// ---- Subjects: per-school catalogue (seed defaults, add, (de)activate) ----
+const SUBJECT_LEVELS = [
+  { value: 'all', label: 'All levels' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'secondary', label: 'Secondary' },
+];
+const subjectLevelLabel = (v) => SUBJECT_LEVELS.find((l) => l.value === v)?.label || 'All levels';
+const SUBJECTS_PAGE_SIZE = 10;
+
+const SubjectsManager = ({ school, actor }) => {
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [level, setLevel] = useState('all');
+  const [busy, setBusy] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [statusBusyId, setStatusBusyId] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setSubjects(await subjectService.listForSchool(school.id));
+    } catch (err) {
+      console.error('Could not load subjects:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [school.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const denied = (err) => err?.code === 'permission-denied'
+    ? 'Permission denied — the latest security rules may not be published yet.'
+    : null;
+
+  const add = async (e) => {
+    e.preventDefault(); setMsg('');
+    if (!name.trim()) { setMsg('Enter a subject name.'); return; }
+    setBusy(true);
+    try {
+      const created = await subjectService.add(school.id, actor, { name, code, level });
+      auditService.log({ schoolId: school.id, actor, action: 'Added subject', targetType: 'subject', targetId: created.id, targetName: created.name });
+      setName(''); setCode(''); setLevel('all'); setMsg('Subject added ✓');
+      load();
+    } catch (err) {
+      setMsg(denied(err) || err.message || 'Could not add the subject.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const seed = async () => {
+    setSeeding(true); setMsg('');
+    try {
+      const added = await subjectService.seedDefaults(school.id, actor, subjects);
+      if (added) auditService.log({ schoolId: school.id, actor, action: `Imported ${added} standard subjects`, targetType: 'subject' });
+      setMsg(added ? `Added ${added} standard subjects ✓` : 'All standard subjects are already here.');
+      load();
+    } catch (err) {
+      setMsg(denied(err) || 'Could not import subjects.');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const toggle = async (s) => {
+    const next = (s.status || 'active') === 'active' ? 'inactive' : 'active';
+    setStatusBusyId(s.id);
+    try {
+      await subjectService.setStatus(s.id, next);
+      setSubjects((p) => p.map((x) => (x.id === s.id ? { ...x, status: next } : x)));
+      auditService.log({ schoolId: school.id, actor, action: next === 'active' ? 'Activated subject' : 'Deactivated subject', targetType: 'subject', targetId: s.id, targetName: s.name });
+    } catch (err) {
+      console.error('subject setStatus failed:', err);
+      setMsg(denied(err) || 'Could not update the subject.');
+    } finally {
+      setStatusBusyId('');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? subjects.filter((s) => (s.name || '').toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q)) : subjects;
+  }, [subjects, search]);
+  useEffect(() => { setPage(0); }, [search]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SUBJECTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * SUBJECTS_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + SUBJECTS_PAGE_SIZE);
+
+  return (
+    <div className="space-y-5">
+      {/* Add a subject */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-1"><FiBookOpen className="text-primary-600" /><h2 className="font-bold text-gray-900">Add a subject</h2></div>
+        <p className="text-sm text-gray-500 mb-3">Add a subject to this school's catalogue and choose the level it's taught at.</p>
+        <form onSubmit={add} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Subject name (e.g. Computer Studies)"
+            className="sm:col-span-5 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code (optional)"
+            className="sm:col-span-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          <select value={level} onChange={(e) => setLevel(e.target.value)}
+            className="sm:col-span-2 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+            {SUBJECT_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+          </select>
+          <button type="submit" disabled={busy}
+            className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            {busy ? <Spinner className="w-4 h-4" /> : <><FiPlus /> Add</>}
+          </button>
+        </form>
+        {msg && <p className={`text-xs mt-2 ${msg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{msg}</p>}
+      </div>
+
+      {/* Catalogue */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-1"><FiBookOpen className="text-primary-600" /><h2 className="font-bold text-gray-900">Subjects</h2></div>
+        <p className="text-sm text-gray-500 mb-3">This school's subjects. Deactivate one to stop offering it (it isn't deleted).</p>
+
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : subjects.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-sm text-gray-500 mb-3">No subjects yet. Start with the standard Malawi curriculum, then add your own.</p>
+            <button onClick={seed} disabled={seeding}
+              className="inline-flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {seeding ? <Spinner className="w-4 h-4" /> : <><FiPlus /> Add the standard Malawi subjects</>}
+            </button>
+          </div>
+        ) : (
+          <>
+            {subjects.length > SUBJECTS_PAGE_SIZE && (
+              <div className="relative mb-3 max-w-sm">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search subjects"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500" />
+              </div>
+            )}
+            {filtered.length === 0 ? (
+              <p className="text-sm text-gray-400 py-4">No subjects match your search.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {pageItems.map((s) => {
+                  const active = (s.status || 'active') === 'active';
+                  return (
+                    <li key={s.id} className="flex items-center gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800 truncate">
+                          {s.name}{s.code ? <span className="text-gray-400 font-normal"> · {s.code}</span> : null}
+                        </p>
+                        <p className="text-xs text-gray-400">{subjectLevelLabel(s.level)}</p>
+                      </div>
+                      <AccountStatusBadge status={active ? 'active' : 'inactive'} />
+                      <ActionMenu
+                        items={[
+                          active
+                            ? { label: 'Deactivate subject', icon: <FiSlash className="w-4 h-4" />, tone: 'danger', onClick: () => toggle(s) }
+                            : { label: 'Activate subject', icon: <FiRefreshCw className="w-4 h-4" />, tone: 'success', onClick: () => toggle(s) },
+                        ]}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {filtered.length > 0 && totalPages > 1 && (
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-400">Showing {start + 1}–{Math.min(filtered.length, start + SUBJECTS_PAGE_SIZE)} of {filtered.length}</p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0} aria-label="Previous page"
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronLeft className="w-4 h-4" /></button>
+                  <span className="text-xs text-gray-500 px-2 tabular-nums">Page {safePage + 1} of {totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} aria-label="Next page"
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"><FiChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ---- Manage one school: admins, teachers, students, parents ----
 const ManageSchool = ({ school, admin, isSuper, onBack }) => {
   const [tab, setTab] = useState('overview');
@@ -1074,6 +1260,7 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
     { id: 'teachers', label: 'Teachers', icon: FiUserCheck },
     { id: 'students', label: 'Students', icon: FiUsers },
     { id: 'parents', label: 'Parents', icon: FiUsers },
+    { id: 'subjects', label: 'Subjects', icon: FiBookOpen },
     { id: 'history', label: 'History', icon: FiClock },
     ...(isSuper ? [{ id: 'settings', label: 'Settings', icon: FiSettings }] : []),
   ];
@@ -1143,6 +1330,8 @@ const ManageSchool = ({ school, admin, isSuper, onBack }) => {
                 description="Invite a parent. When they sign up with this email they can follow their child's progress." />
             } />
         )}
+
+        {tab === 'subjects' && <SubjectsManager school={school} actor={admin} />}
 
         {tab === 'history' && <AuditLog school={school} />}
 
