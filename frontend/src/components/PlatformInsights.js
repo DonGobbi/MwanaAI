@@ -45,7 +45,7 @@ function buildSnapshot({ stats, schools, members, activity, schoolName, generate
     (bySchoolMembers[sid] = bySchoolMembers[sid] || []).push(m);
   });
   const memberLine = (m) =>
-    `  - ${m.displayName || m.email || 'Unnamed'} — ${ROLE[m.userType] || m.userType || 'unknown role'} (${(m.status || 'active').toLowerCase()})`;
+    `  - ${m.displayName || 'Unnamed'} <${m.email || 'no email on file'}> — ${ROLE[m.userType] || m.userType || 'unknown role'} (${(m.status || 'active').toLowerCase()})`;
 
   const schoolLines = schools
     .map((s) => {
