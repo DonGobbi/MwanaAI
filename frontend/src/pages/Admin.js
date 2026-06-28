@@ -1249,7 +1249,8 @@ const ClassroomsManager = ({ school, actor }) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState('');
-  const [section, setSection] = useState('');
+  const [mode, setMode] = useState('single'); // 'single' | 'sections'
+  const [sectionsInput, setSectionsInput] = useState('');
   const [capacity, setCapacity] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -1275,17 +1276,25 @@ const ClassroomsManager = ({ school, actor }) => {
   const add = async (e) => {
     e.preventDefault(); setMsg('');
     if (!level) { setMsg('Pick a level.'); return; }
-    if (!section.trim()) { setMsg('Enter a section (e.g. A).'); return; }
     const levelLabel = getGradeLevel(level)?.label || level;
-    if (rooms.some((r) => r.level === level && (r.section || '').toLowerCase() === section.trim().toLowerCase())) {
-      setMsg(`${levelLabel} ${section.trim()} already exists.`);
-      return;
-    }
     setBusy(true);
     try {
-      const created = await classroomService.add(school.id, actor, { level, levelLabel, section, capacity });
-      auditService.log({ schoolId: school.id, actor, action: 'Added classroom', targetType: 'classroom', targetId: created.id, targetName: created.name });
-      setSection(''); setCapacity(''); setMsg('Classroom added ✓');
+      if (mode === 'single') {
+        if (rooms.some((r) => r.level === level && !(r.section || '').trim())) {
+          setMsg(`${levelLabel} already exists as a single class.`);
+          return;
+        }
+        const created = await classroomService.add(school.id, actor, { level, levelLabel, section: '', capacity });
+        auditService.log({ schoolId: school.id, actor, action: 'Added classroom', targetType: 'classroom', targetId: created.id, targetName: created.name });
+        setMsg(`Added ${created.name} ✓`);
+      } else {
+        const list = sectionsInput.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+        if (!list.length) { setMsg('Enter at least one section, e.g. A, B, C.'); return; }
+        const added = await classroomService.addSections(school.id, actor, { level, levelLabel, sections: list, capacity }, rooms);
+        if (added) auditService.log({ schoolId: school.id, actor, action: `Added ${added} classroom${added !== 1 ? 's' : ''}`, targetType: 'classroom', targetName: `${levelLabel} · ${added} section${added !== 1 ? 's' : ''}` });
+        setMsg(added ? `Added ${added} section${added !== 1 ? 's' : ''} ✓` : 'Those sections already exist.');
+      }
+      setSectionsInput(''); setCapacity('');
       load();
     } catch (err) {
       setMsg(denied(err) || err.message || 'Could not add the classroom.');
@@ -1325,29 +1334,60 @@ const ClassroomsManager = ({ school, actor }) => {
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-1"><FiGrid className="text-primary-600" /><h2 className="font-bold text-gray-900">Add a classroom</h2></div>
         <p className="text-sm text-gray-500 mb-3">Split a busy level into sections — e.g. Form 1 <strong>A</strong>, <strong>B</strong>, <strong>C</strong>.</p>
-        <form onSubmit={add} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-          <select value={level} onChange={(e) => setLevel(e.target.value)}
-            className="sm:col-span-4 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
-            <option value="">Level / Form</option>
-            <optgroup label="Primary">
-              {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </optgroup>
-            <optgroup label="Secondary">
-              {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </optgroup>
-          </select>
-          <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="Section (e.g. A)" maxLength={12}
-            className="sm:col-span-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-          <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Capacity (optional)" inputMode="numeric"
-            className="sm:col-span-3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
-          <button type="submit" disabled={busy}
-            className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            {busy ? <Spinner className="w-4 h-4" /> : <><FiPlus /> Add</>}
-          </button>
+        <form onSubmit={add} className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <select value={level} onChange={(e) => setLevel(e.target.value)}
+              className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+              <option value="">Level / Form</option>
+              <optgroup label="Primary">
+                {GRADE_LEVELS.filter((g) => g.stage === 'Primary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </optgroup>
+              <optgroup label="Secondary">
+                {GRADE_LEVELS.filter((g) => g.stage === 'Secondary').map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </optgroup>
+            </select>
+            <input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Capacity per class (optional)" inputMode="numeric"
+              className="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          </div>
+
+          {/* How is this level organised? */}
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5">How is this level organised?</p>
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => setMode('single')}
+                className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${mode === 'single' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                Single class
+              </button>
+              <button type="button" onClick={() => setMode('sections')}
+                className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${mode === 'sections' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                Split into sections (A, B, C…)
+              </button>
+            </div>
+          </div>
+
+          {mode === 'sections' && (
+            <input value={sectionsInput} onChange={(e) => setSectionsInput(e.target.value)} placeholder="Sections — e.g. A, B, C"
+              className="w-full sm:w-2/3 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" />
+          )}
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button type="submit" disabled={busy}
+              className="inline-flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {busy ? <Spinner className="w-4 h-4" /> : <><FiPlus /> {mode === 'single' ? 'Add class' : 'Add sections'}</>}
+            </button>
+            {level && (
+              <span className="text-xs text-gray-400">
+                {mode === 'single' ? (
+                  <>Creates <span className="font-medium text-gray-600">{getGradeLevel(level)?.label}</span> as one class.</>
+                ) : sectionsInput.trim() ? (
+                  <>Creates <span className="font-medium text-gray-600">{sectionsInput.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean).slice(0, 6).map((s) => `${getGradeLevel(level)?.label} ${s}`).join(', ')}</span></>
+                ) : (
+                  <>e.g. {getGradeLevel(level)?.label} A, {getGradeLevel(level)?.label} B, {getGradeLevel(level)?.label} C</>
+                )}
+              </span>
+            )}
+          </div>
         </form>
-        {level && section.trim() && (
-          <p className="text-xs text-gray-400 mt-2">New classroom: <span className="font-medium text-gray-600">{getGradeLevel(level)?.label} {section.trim()}</span></p>
-        )}
         {msg && <p className={`text-xs mt-2 ${msg.includes('✓') ? 'text-green-600' : 'text-amber-600'}`}>{msg}</p>}
       </div>
 
