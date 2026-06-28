@@ -57,20 +57,32 @@ const NAV = {
   ],
   superadmin: [
     {
-      label: 'Admin',
+      label: 'Platform',
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
         { to: '/admin', icon: FiHome, text: 'Schools' },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },
       ],
     },
   ],
   // School Admins manage a single school.
   admin: [
     {
-      label: 'Admin',
+      label: 'School',
       items: [
         { to: '/', icon: FiGrid, text: 'Dashboard', end: true },
         { to: '/admin', icon: FiHome, text: 'My School' },
+      ],
+    },
+    {
+      label: 'Tools',
+      items: [
+        { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },
       ],
     },
   ],

@@ -21,16 +21,23 @@ export const accountService = {
   // platform is small; swap for maintained aggregate counters at large scale.
   async platformStats() {
     const snap = await getDocs(collection(db, 'users'));
-    const counts = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 };
+    const counts = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0, deactivated: 0 };
+    const bySchool = {}; // schoolId -> { student, teacher, admin, parent, total }
     snap.docs.forEach((d) => {
       const u = d.data();
-      if ((u.status || 'active').toLowerCase() === 'archived') return;
-      if (counts[u.userType] != null) {
-        counts[u.userType] += 1;
-        counts.total += 1;
+      const status = (u.status || 'active').toLowerCase();
+      if (status === 'archived') return;
+      if (status === 'deactivated') counts.deactivated += 1;
+      if (counts[u.userType] == null) return;
+      counts[u.userType] += 1;
+      counts.total += 1;
+      if (u.schoolId) {
+        const b = bySchool[u.schoolId] || (bySchool[u.schoolId] = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 });
+        b[u.userType] += 1;
+        b.total += 1;
       }
     });
-    return counts;
+    return { ...counts, bySchool };
   },
 
   // active | deactivated | archived. Records who acted and when so it can feed

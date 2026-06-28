@@ -30,6 +30,7 @@ import {
   FiLayers,
   FiHome,
   FiActivity,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 
 // Compact relative time for the activity feed.
@@ -642,18 +643,31 @@ const AdminHome = ({ firstName, role }) => {
   const activeSchools = schools.filter((s) => (s.status || 'active').toLowerCase() === 'active').length;
   const suspended = schools.length - activeSchools;
   const v = (n) => (loading ? '…' : n);
+  const bySchool = counts.bySchool || {};
+  // Most-active schools first (by member count).
+  const sortedSchools = [...schools].sort((a, b) => (bySchool[b.id]?.total || 0) - (bySchool[a.id]?.total || 0));
+  const noTeachers = schools.filter((s) => !(bySchool[s.id]?.teacher)).length;
+  const noStudents = schools.filter((s) => !(bySchool[s.id]?.student)).length;
+  const alerts = isSuper && !loading
+    ? [
+        suspended ? `${suspended} suspended school${suspended !== 1 ? 's' : ''}` : null,
+        noTeachers ? `${noTeachers} school${noTeachers !== 1 ? 's' : ''} with no teachers` : null,
+        noStudents ? `${noStudents} school${noStudents !== 1 ? 's' : ''} with no students` : null,
+        counts.deactivated ? `${counts.deactivated} deactivated account${counts.deactivated !== 1 ? 's' : ''} to review` : null,
+      ].filter(Boolean)
+    : [];
 
   return (
     <>
-      <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-sm">
-        <h1 className="text-2xl sm:text-3xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
-        <p className="text-primary-50 mt-1">
+      <div className="rounded-2xl bg-gradient-to-r from-secondary-900 to-primary-700 text-white p-5 sm:p-6 mb-5 shadow-sm">
+        <h1 className="text-2xl font-bold">Welcome{firstName ? `, ${firstName}` : ''} 👋</h1>
+        <p className="text-primary-50 text-sm mt-0.5">
           {isSuper ? 'Your platform at a glance — schools and everyone in them.' : 'Your school at a glance.'}
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {isSuper && (
           <StatTile icon={FiHome} value={v(schools.length)}
             label={schools.length ? (suspended ? `Schools · ${suspended} suspended` : 'Schools · all active') : 'Schools'}
@@ -665,86 +679,89 @@ const AdminHome = ({ firstName, role }) => {
         {!isSuper && <StatTile icon={FiHome} value={v(counts.admin)} label="School admins" color="bg-rose-100 text-rose-600" />}
       </div>
 
-      {/* Super Admin: the schools, right here */}
-      {isSuper && (
-        <div className="card p-5 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-gray-900">Schools</h2>
-            <Link to="/admin" className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1">
-              Manage all <FiArrowRight className="w-3.5 h-3.5" />
-            </Link>
+      {/* Alerts — compact, only when there's something to act on */}
+      {alerts.length > 0 && (
+        <div className="card p-3.5 mb-5 border border-amber-200 bg-amber-50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <FiAlertTriangle className="text-amber-500 w-4 h-4 flex-shrink-0" />
+            <span className="text-sm font-semibold text-amber-800 mr-1">Needs attention:</span>
+            {alerts.map((a, i) => (
+              <Link key={i} to="/admin" className="text-xs bg-white border border-amber-200 text-amber-800 px-2.5 py-1 rounded-full hover:bg-amber-100 transition-colors">
+                {a}
+              </Link>
+            ))}
           </div>
-          {loading ? (
-            <p className="text-sm text-gray-400">Loading…</p>
-          ) : schools.length === 0 ? (
-            <p className="text-sm text-gray-500">No schools yet. <Link to="/admin" className="text-primary-600 hover:underline">Register your first school</Link>.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {schools.slice(0, 5).map((s) => (
-                <li key={s.id}>
-                  <Link to={`/admin/schools/${s.id}/overview`} className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded-lg hover:bg-gray-50">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <FiHome className="text-primary-600 flex-shrink-0" />
-                      <span className="font-medium text-gray-800 truncate">{s.name}</span>
-                      {(s.status || 'active').toLowerCase() !== 'active' && (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex-shrink-0">suspended</span>
-                      )}
-                    </span>
-                    <FiArrowRight className="text-gray-300 flex-shrink-0" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
-      {/* Super Admin: recent activity across all schools */}
-      {isSuper && (
-        <div className="card p-5 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <FiActivity className="text-primary-600" />
-            <h2 className="font-bold text-gray-900">Recent activity</h2>
+      {/* Super Admin: schools + activity side-by-side (less scrolling) */}
+      {isSuper ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Schools (most active first) */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-gray-900">Schools</h2>
+              <Link to="/admin" className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1">
+                Manage all <FiArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            {loading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : schools.length === 0 ? (
+              <p className="text-sm text-gray-500">No schools yet. <Link to="/admin" className="text-primary-600 hover:underline">Register your first school</Link>.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {sortedSchools.slice(0, 6).map((s) => (
+                  <li key={s.id}>
+                    <Link to={`/admin/schools/${s.id}/overview`} className="flex items-center justify-between py-2 -mx-2 px-2 rounded-lg hover:bg-gray-50">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <FiHome className="text-primary-600 flex-shrink-0" />
+                        <span className="font-medium text-gray-800 truncate text-sm">{s.name}</span>
+                        {(s.status || 'active').toLowerCase() !== 'active' && (
+                          <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full flex-shrink-0">suspended</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{bySchool[s.id]?.total || 0} people</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          {loading ? (
-            <p className="text-sm text-gray-400">Loading…</p>
-          ) : activity.length === 0 ? (
-            <p className="text-sm text-gray-500">No activity yet. Actions like invites, deactivations and school changes will show here.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {activity.map((l) => {
-                const schoolName = schools.find((s) => s.id === l.schoolId)?.name;
-                return (
-                  <li key={l.id} className="flex items-start gap-3 py-2.5">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <FiActivity className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-800">
+
+          {/* Recent activity */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FiActivity className="text-primary-600" />
+              <h2 className="font-bold text-gray-900">Recent activity</h2>
+            </div>
+            {loading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : activity.length === 0 ? (
+              <p className="text-sm text-gray-500">No activity yet. Invites, deactivations and school changes show here.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {activity.slice(0, 6).map((l) => {
+                  const schoolName = schools.find((s) => s.id === l.schoolId)?.name;
+                  return (
+                    <li key={l.id} className="py-2">
+                      <p className="text-sm text-gray-800 truncate">
                         <span className="font-medium">{l.actorName}</span> · {l.action}
                         {l.targetName ? <> — <span className="text-gray-600">{l.targetName}</span></> : null}
                       </p>
-                      <p className="text-xs text-gray-400">
-                        {schoolName ? `${schoolName} · ` : ''}{ago(l.createdAt)}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      <p className="text-xs text-gray-400">{schoolName ? `${schoolName} · ` : ''}{ago(l.createdAt)}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DashboardCard to="/admin" icon={FiHome} title={isSuper ? 'Manage schools' : 'My School'}
-          text={isSuper
-            ? 'Register a school, then open it to add admins, teachers, students and parents.'
-            : 'Add admins, teachers, students and parents to your school.'}
+      ) : (
+        <DashboardCard to="/admin" icon={FiHome} title="My School"
+          text="Add admins, teachers, students and parents, set up subjects and classrooms, and review activity."
           color="bg-sky-100 text-sky-600" />
-        <DashboardCard to="/tutor" icon={FiMessageCircle} title="Tutor" text="Try the AI tutor yourself." color="bg-violet-100 text-violet-600" />
-      </div>
+      )}
     </>
   );
 };
