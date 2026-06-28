@@ -111,6 +111,7 @@ const PlatformInsights = () => {
   const [error, setError] = useState('');
   const [executingId, setExecutingId] = useState('');
   const threadRef = useRef(null);
+  const inputRef = useRef(null);
 
   const viewer = useMemo(() => ({
     role: userProfile?.userType || 'superadmin',
@@ -156,6 +157,22 @@ const PlatformInsights = () => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, asking]);
+
+  // Grow the message box with its content (up to a cap, then it scrolls).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    }
+  }, [input]);
+
+  const onInputKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
 
   const send = async (q) => {
     const text = (q ?? input).trim();
@@ -291,16 +308,20 @@ const PlatformInsights = () => {
             ))}
           </div>
         )}
-        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-center gap-2">
-          <input
+        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Message the assistant…"
+            onKeyDown={onInputKeyDown}
+            placeholder="Message the assistant…  (Enter to send, Shift+Enter for a new line)"
             disabled={loading}
-            className="flex-1 px-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500"
+            style={{ maxHeight: '140px' }}
+            className="flex-1 px-3 py-2 rounded-lg border-gray-300 shadow-sm text-sm leading-relaxed resize-none focus:border-primary-500 focus:ring-primary-500"
           />
           <button type="submit" disabled={asking || loading || !input.trim()}
-            className="p-2.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50" aria-label="Send">
+            className="p-2.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 flex-shrink-0" aria-label="Send">
             <FiSend className="w-4 h-4" />
           </button>
         </form>
