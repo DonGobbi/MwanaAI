@@ -250,6 +250,19 @@ const TOOLS = {
     if (exists) return { error: `A school named "${exists.name}" already exists, so there is nothing to create.` };
     return { proposal: { type: 'create_school', schoolName: name, summary: `Create a new school: ${name}`, impact: 'it will be registered on the platform; you can then add its classrooms and subjects and invite its administrator', confirmLabel: 'Create school' } };
   },
+  async add_classroom(args, viewer) {
+    const name = (args.classroom || args.name || '').trim();
+    if (!name) return { error: 'What is the name of the classroom to add (e.g. "Form 1 A" or "Standard 2")?' };
+    const s = await findSchool(args.school, viewer);
+    if (!s) return { error: `No school matching "${args.school}".` };
+    let existing = [];
+    try { existing = await classroomService.listForSchool(s.id); } catch (_) {}
+    if (existing.some((c) => (c.name || '').trim().toLowerCase() === name.toLowerCase() && (c.status || 'active') !== 'inactive')) {
+      return { error: `${s.name} already has a classroom called "${name}".` };
+    }
+    const capacity = Number(args.capacity) || 0;
+    return { proposal: { type: 'add_classroom', schoolId: s.id, schoolName: s.name, className: name, capacity, summary: `Add the classroom "${name}"${capacity ? ` (capacity ${capacity})` : ''} to ${s.name}`, confirmLabel: 'Add classroom' } };
+  },
 };
 
 // Run a confirmed action (called by the UI AFTER the user clicks Confirm).
@@ -289,6 +302,11 @@ export async function executeAction(action, viewer) {
       log({ schoolId: created.id, action: 'Registered school', targetType: 'school', targetId: created.id, targetName: created.name });
       return `Done — "${created.name}" has been registered. You can now add its classrooms and subjects, or invite its administrator.`;
     }
+    case 'add_classroom':
+      // Store the name the user gave verbatim (as the level label; no section).
+      await classroomService.add(action.schoolId, actor, { level: action.className, levelLabel: action.className, section: '', capacity: action.capacity });
+      log({ schoolId: action.schoolId, action: 'Added classroom', targetType: 'classroom', targetName: action.className });
+      return `Done — added the classroom "${action.className}" to ${action.schoolName}.`;
     default:
       throw new Error('Unknown action.');
   }
@@ -375,6 +393,12 @@ const TOOL_DEFS = [
     type: 'function',
     function: { name: 'create_school', description: 'Prepare to create/register a NEW school on the platform (super admin only). Requires user confirmation. Use when the user wants to add a school/institution that does not exist yet. Use the name exactly as the user gave it — do not invent a name.', parameters: { type: 'object', properties: { name: { type: 'string', description: 'the name of the new school, exactly as the user wrote it' } }, required: ['name'] } },
   },
+  {
+    type: 'function',
+    // NOTE: `capacity` has no `type` — llama sends numbers as quoted strings and
+    // Groq's strict tool-arg validation 400s a number/string mismatch.
+    function: { name: 'add_classroom', description: 'Prepare to add a classroom or section to a school (e.g. "Form 1 A", "Standard 2"). Requires user confirmation.', parameters: { type: 'object', properties: { classroom: { type: 'string', description: 'the classroom/section name, e.g. "Form 1 A" or "Standard 2"' }, school: { type: 'string' }, capacity: { description: 'optional: maximum number of students (a number)' } }, required: ['classroom', 'school'] } },
+  },
 ];
 
 function systemPrompt(viewer) {
@@ -394,7 +418,7 @@ How to choose tools:
 - Use get_person for one named person, and get_activity_log for admin history.
 You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown — and when names were requested, ACTUALLY LIST the people by name. If the data genuinely has no answer, say so plainly.
 
-You can also PREPARE actions: create_school, suspend_school, reactivate_school, deactivate_account, reactivate_account, invite_user, add_subject. CRITICAL: these tools only PREPARE the action and compute its impact — NOTHING is changed until the user clicks Confirm. After calling an action tool, clearly state exactly what will happen (including any impact) and tell the user to confirm. NEVER say an action is already done. If an action tool returns an error (target not found, already in that state, missing detail), explain it and ask for what's needed.`;
+You can also PREPARE actions: create_school, suspend_school, reactivate_school, deactivate_account, reactivate_account, invite_user, add_subject, add_classroom. CRITICAL: these tools only PREPARE the action and compute its impact — NOTHING is changed until the user clicks Confirm. After calling an action tool, clearly state exactly what will happen (including any impact) and tell the user to confirm. NEVER say an action is already done. If an action tool returns an error (target not found, already in that state, missing detail), explain it and ask for what's needed.`;
 }
 
 // A prompt rule alone does NOT reliably stop the model from resetting a vague
