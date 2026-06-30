@@ -1,31 +1,46 @@
 import { groqChat } from './groqClient';
 
-const PLATFORM_SYSTEM =
-  'You are the platform operations assistant for MwanaAI, an education platform for schools in Malawi. ' +
-  'You support the super administrator in understanding the health of the entire platform across all schools. ' +
+const TONE_AND_GROUNDING =
   'Write in clear, professional and courteous prose suitable for a senior administrator: complete, well-formed ' +
   'sentences, an academic yet accessible tone, and a respectful register. Be precise, practical and concise. ' +
   'Every figure and fact you state comes from a live database snapshot supplied to you. Base every statement ' +
   'ONLY on that data — never invent, estimate or assume schools, numbers, names, dates or trends. If the data ' +
   'does not contain the answer, say so politely and suggest where in the platform the administrator can look.';
 
+const PLATFORM_SYSTEM =
+  'You are the platform operations assistant for MwanaAI, an education platform for schools in Malawi. ' +
+  'You support the super administrator in understanding the health of the entire platform across all schools. ' +
+  TONE_AND_GROUNDING;
+
+const schoolSystem = (schoolName) =>
+  'You are the operations assistant for MwanaAI, an education platform for schools in Malawi. ' +
+  `You support the administrator of ${schoolName || 'their school'} in understanding the health of THEIR school. ` +
+  'You only have data for that one school — never report on, compare with, or speculate about other schools. ' +
+  TONE_AND_GROUNDING;
+
 // AI-powered tools that turn data and topics into useful, ready-to-use content.
 export const aiInsights = {
-  // A short, prioritised operations briefing for the super admin, grounded in a
-  // text snapshot of the whole platform (totals, per-school counts, flags,
-  // recent activity). Returns Markdown.
-  async platformBriefing({ snapshot }) {
+  // A short, prioritised operations briefing, grounded in a text snapshot
+  // (totals, per-school counts, flags, recent activity). Returns Markdown.
+  // scope: 'platform' (super admin, whole platform) or 'school' (school admin,
+  // their one school) — picks the system prompt and tailors the examples.
+  async platformBriefing({ snapshot, scope = 'platform', schoolName }) {
+    const isSchool = scope === 'school';
+    const subject = isSchool ? (schoolName || 'your school') : 'the platform';
+    const attentionEg = isSchool
+      ? 'e.g. students but no teacher, a deactivated teacher or student, accounts about to be auto-deleted, no recent activity'
+      : 'e.g. a school with students but no teacher, a suspended school, accounts about to be auto-deleted';
     return groqChat(
       [
-        { role: 'system', content: PLATFORM_SYSTEM },
+        { role: 'system', content: isSchool ? schoolSystem(schoolName) : PLATFORM_SYSTEM },
         {
           role: 'user',
-          content: `Here is the current platform snapshot:
+          content: `Here is the current snapshot of ${subject}:
 
 ${snapshot}
 
 Write a brief operations briefing in Markdown with these sections:
-**What needs attention** — the 2-4 most important issues, most urgent first (e.g. a school with students but no teacher, a suspended school, accounts about to be auto-deleted). If nothing stands out, say the platform looks healthy.
+**What needs attention** — the 2-4 most important issues, most urgent first (${attentionEg}). If nothing stands out, say ${subject} looks healthy.
 **What's happening** — 1-2 sentences on recent activity and overall size.
 **Suggested next step** — one concrete action the administrator could take.
 Keep it under ~160 words. Base everything ONLY on the snapshot above.`,

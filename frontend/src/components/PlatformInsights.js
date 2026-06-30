@@ -9,11 +9,17 @@ import { accountService } from '../services/accountService';
 import { schoolService } from '../services/schoolService';
 import { auditService } from '../services/auditService';
 
-const SUGGESTIONS = [
+const PLATFORM_SUGGESTIONS = [
   'Give me a full summary of the platform',
   'Which schools have no teachers?',
   'Which school is the most active?',
   'Are any schools suspended or empty?',
+];
+const SCHOOL_SUGGESTIONS = [
+  'Give me a summary of my school',
+  'Who are my teachers and students?',
+  'Which students have no recent activity?',
+  'List everyone and their email',
 ];
 
 const ago = (ts) => {
@@ -30,6 +36,24 @@ const ago = (ts) => {
 
 const ROLE = { admin: 'school admin', teacher: 'teacher', student: 'student', parent: 'parent' };
 const MEMBER_CAP = 150; // safety cap so a huge platform can't blow the token budget
+
+// Build a platformStats-shaped object from one school's members, so a school
+// admin's briefing uses the same snapshot code path as the super admin.
+function scopedStats(members, schoolId) {
+  const counts = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0, deactivated: 0 };
+  const b = { student: 0, teacher: 0, admin: 0, parent: 0, total: 0 };
+  members.forEach((u) => {
+    const status = (u.status || 'active').toLowerCase();
+    if (status === 'archived' || status === 'deleted') return;
+    if (status === 'deactivated') counts.deactivated += 1;
+    if (counts[u.userType] == null) return;
+    counts[u.userType] += 1;
+    counts.total += 1;
+    b[u.userType] += 1;
+    b.total += 1;
+  });
+  return { ...counts, bySchool: { [schoolId]: b } };
+}
 
 // Turn the live platform data into a compact, factual snapshot for the opening
 // briefing. Flags are computed here (deterministic) so the AI never has to guess.
@@ -82,11 +106,14 @@ function buildSnapshot({ stats, schools, members, admins, activity, schoolName, 
     })
     .join('\n');
 
+  const isSchoolScope = viewer && viewer.role !== 'superadmin';
   const viewerLine = viewer
-    ? `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the platform super administrator. When they say "me", "I" or "my", they mean this account.\n\n`
+    ? (isSchoolScope
+        ? `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the administrator of ${viewer.schoolName || schoolName[viewer.schoolId] || 'their school'}. You only have data for that one school. When they say "me", "I" or "my", they mean this account.\n\n`
+        : `You are assisting ${viewer.name}${viewer.email ? ` <${viewer.email}>` : ''} — the platform super administrator. When they say "me", "I" or "my", they mean this account.\n\n`)
     : '';
 
-  return `PLATFORM SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
+  return `${isSchoolScope ? 'SCHOOL' : 'PLATFORM'} SNAPSHOT${generatedAt ? ` (live from the database, as of ${generatedAt})` : ''}
 ${viewerLine}Totals: ${totals}
 
 Schools and the people in them${truncated ? ` (showing the first ${MEMBER_CAP} of ${members.length} accounts)` : ''}:
@@ -122,23 +149,43 @@ const PlatformInsights = () => {
     uid: currentUser?.uid || '',
   }), [currentUser, userProfile]);
 
-  // Opening briefing — also starts a fresh conversation.
+  // Opening briefing — also starts a fresh conversation. Scoped by role: a super
+  // admin sees the whole platform; a school admin sees only their own school.
   const startConversation = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [stats, schools, members, admins, activity] = await Promise.all([
-        accountService.platformStats(),
-        schoolService.listSchools(),
-        accountService.listAll(),
-        accountService.listSuperAdmins(),
-        auditService.listRecent(25),
-      ]);
+      const isSchoolScope = viewer.role !== 'superadmin';
+      let stats, schools, members, admins, activity;
+      if (isSchoolScope) {
+        const [school, mem, act] = await Promise.all([
+          schoolService.getSchool(viewer.schoolId),
+          accountService.listBySchool(viewer.schoolId),
+          auditService.listForSchool(viewer.schoolId, 25),
+        ]);
+        schools = school ? [school] : [];
+        members = mem.filter((u) => !['archived', 'deleted'].includes((u.status || 'active').toLowerCase()));
+        stats = scopedStats(members, viewer.schoolId);
+        admins = []; // a school admin does not see platform super admins
+        activity = act;
+      } else {
+        [stats, schools, members, admins, activity] = await Promise.all([
+          accountService.platformStats(),
+          schoolService.listSchools(),
+          accountService.listAll(),
+          accountService.listSuperAdmins(),
+          auditService.listRecent(25),
+        ]);
+      }
       const schoolName = {};
       schools.forEach((s) => { schoolName[s.id] = s.name; });
       const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
       const snap = buildSnapshot({ stats, schools, members, admins, activity, schoolName, generatedAt, viewer });
-      const text = await aiInsights.platformBriefing({ snapshot: snap });
+      const text = await aiInsights.platformBriefing({
+        snapshot: snap,
+        scope: isSchoolScope ? 'school' : 'platform',
+        schoolName: isSchoolScope ? (schools[0]?.name || viewer.schoolName) : undefined,
+      });
       setMessages([{ id: 'briefing', role: 'assistant', content: text }]);
     } catch (err) {
       console.error('Platform insights failed:', err);
@@ -217,6 +264,8 @@ const PlatformInsights = () => {
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, pendingAction: null, actionResult: { ok: true, text: 'Cancelled — nothing was changed.' } } : m)));
   };
 
+  const isSchoolScope = viewer.role !== 'superadmin';
+  const suggestions = isSchoolScope ? SCHOOL_SUGGESTIONS : PLATFORM_SUGGESTIONS;
   const showSuggestions = !loading && messages.filter((m) => m.role === 'user').length === 0;
 
   return (
@@ -229,7 +278,7 @@ const PlatformInsights = () => {
           </span>
           <div>
             <h2 className="font-bold text-gray-900 leading-tight">Assistant</h2>
-            <p className="text-xs text-gray-400">Ask about your platform, or tell me to do something</p>
+            <p className="text-xs text-gray-400">Ask about your {isSchoolScope ? 'school' : 'platform'}, or tell me to do something</p>
           </div>
         </div>
         <button onClick={startConversation} disabled={loading} title="New conversation"
@@ -300,7 +349,7 @@ const PlatformInsights = () => {
       <div className="px-4 py-3 border-t border-gray-100">
         {showSuggestions && (
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {SUGGESTIONS.map((s) => (
+            {suggestions.map((s) => (
               <button key={s} onClick={() => send(s)} disabled={asking}
                 className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">
                 {s}

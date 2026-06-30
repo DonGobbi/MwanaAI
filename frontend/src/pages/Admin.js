@@ -1793,13 +1793,13 @@ const NoSchoolAssigned = () => (
   </div>
 );
 
-// ---- AI Assistant (Super Admin) ----
-const AssistantPage = () => (
+// ---- AI Assistant (Super Admin: whole platform; School Admin: their school) ----
+const AssistantPage = ({ isSuper }) => (
   <div className="bg-gray-50 min-h-screen">
     <div className="container py-8 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Assistant</h1>
       <p className="text-gray-600 text-sm mb-6">
-        Ask anything about your platform, or get a briefing. Answers come straight from your live data.
+        Ask anything about your {isSuper ? 'platform' : 'school'}, or get a briefing. Answers come straight from your live data.
       </p>
       <PlatformInsights />
     </div>
@@ -2047,7 +2047,7 @@ const Admin = () => {
       />
       <Route path="users" element={isSuper ? <PlatformUsers /> : <Navigate to="/admin" replace />} />
       <Route path="activity" element={isSuper ? <PlatformActivity /> : <Navigate to="/admin" replace />} />
-      <Route path="insights" element={isSuper ? <AssistantPage /> : <Navigate to="/admin" replace />} />
+      <Route path="insights" element={<AssistantPage isSuper={isSuper} />} />
       <Route path="schools/:schoolId" element={<SchoolOverviewRedirect />} />
       <Route path="schools/:schoolId/:tab" element={<ManageSchoolRoute admin={currentUser} isSuper={isSuper} userProfile={userProfile} />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
