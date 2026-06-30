@@ -451,7 +451,9 @@ const StudentHome = ({ firstName }) => {
 };
 
 const DashboardCard = ({ to, icon: Icon, title, text, color }) => (
-  <Link to={to} className="card p-5 hover:shadow-md transition-shadow">
+  // `block` is required: a <Link> is an inline <a> by default, so on its own
+  // (not inside a grid/flex that blockifies it) the card collapses to a sliver.
+  <Link to={to} className="block card p-5 hover:shadow-md transition-shadow">
     <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${color}`}>
       <Icon className="w-5 h-5" />
     </div>

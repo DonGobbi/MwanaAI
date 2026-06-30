@@ -87,7 +87,6 @@ const NAV = {
       label: 'Tools',
       items: [
         { to: '/admin/insights', icon: FiZap, text: 'Assistant' },
-        { to: '/tutor', icon: FiMessageCircle, text: 'Tutor' },
       ],
     },
   ],
