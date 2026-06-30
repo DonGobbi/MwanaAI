@@ -160,7 +160,7 @@ const TOOLS = {
   },
 
   async get_activity_log(args, viewer) {
-    const limit = Math.min(args.limit || 25, 60);
+    const limit = Math.min(Number(args.limit) || 25, 60);
     let log = await auditForViewer(viewer, 200);
     if (args.person) {
       const q = args.person.toLowerCase();
@@ -239,6 +239,17 @@ const TOOLS = {
     if (!s) return { error: `No school matching "${args.school}".` };
     return { proposal: { type: 'add_subject', schoolId: s.id, schoolName: s.name, subjectName: args.subject.trim(), summary: `Add the subject "${args.subject.trim()}" to ${s.name}`, confirmLabel: 'Add subject' } };
   },
+  async create_school(args, viewer) {
+    if (!onlySuper(viewer)) return { error: 'Only a super administrator can create a school.' };
+    const name = (args.name || '').trim();
+    if (!name) return { error: 'What is the name of the school you would like to create?' };
+    // Exact-name duplicate guard (findSchool does partial matching, which is too
+    // loose for "does this already exist" — "Mwanga" must not block "Mwanga Stella Maris").
+    const schools = await schoolsForViewer(viewer);
+    const exists = schools.find((s) => (s.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (exists) return { error: `A school named "${exists.name}" already exists, so there is nothing to create.` };
+    return { proposal: { type: 'create_school', schoolName: name, summary: `Create a new school: ${name}`, impact: 'it will be registered on the platform; you can then add its classrooms and subjects and invite its administrator', confirmLabel: 'Create school' } };
+  },
 };
 
 // Run a confirmed action (called by the UI AFTER the user clicks Confirm).
@@ -273,6 +284,11 @@ export async function executeAction(action, viewer) {
       await subjectService.add(action.schoolId, actor, { name: action.subjectName });
       log({ schoolId: action.schoolId, action: 'Added subject', targetType: 'subject', targetName: action.subjectName });
       return `Done — added "${action.subjectName}" to ${action.schoolName}.`;
+    case 'create_school': {
+      const created = await schoolService.createSchool(viewer.uid, action.schoolName);
+      log({ schoolId: created.id, action: 'Registered school', targetType: 'school', targetId: created.id, targetName: created.name });
+      return `Done — "${created.name}" has been registered. You can now add its classrooms and subjects, or invite its administrator.`;
+    }
     default:
       throw new Error('Unknown action.');
   }
@@ -316,7 +332,10 @@ const TOOL_DEFS = [
     function: {
       name: 'get_activity_log',
       description: 'Recent admin actions (the audit log): who archived / restored / invited / deactivated / deleted whom, and when. Optionally filter by a person or school.',
-      parameters: { type: 'object', properties: { person: { type: 'string' }, school: { type: 'string' }, limit: { type: 'number' } } },
+      // NOTE: no `type` on `limit` — llama sends numbers as quoted strings and
+      // Groq's strict tool-arg validation 400s a number/string mismatch, which
+      // would break the whole turn. We accept either and coerce in the executor.
+      parameters: { type: 'object', properties: { person: { type: 'string' }, school: { type: 'string' }, limit: { description: 'optional: how many entries to return (a number)' } } },
     },
   },
   {
@@ -352,6 +371,10 @@ const TOOL_DEFS = [
     type: 'function',
     function: { name: 'add_subject', description: 'Prepare to add a subject to a school. Requires user confirmation.', parameters: { type: 'object', properties: { subject: { type: 'string' }, school: { type: 'string' } }, required: ['subject', 'school'] } },
   },
+  {
+    type: 'function',
+    function: { name: 'create_school', description: 'Prepare to create/register a NEW school on the platform (super admin only). Requires user confirmation. Use when the user wants to add a school/institution that does not exist yet. Use the name exactly as the user gave it — do not invent a name.', parameters: { type: 'object', properties: { name: { type: 'string', description: 'the name of the new school, exactly as the user wrote it' } }, required: ['name'] } },
+  },
 ];
 
 function systemPrompt(viewer) {
@@ -371,7 +394,23 @@ How to choose tools:
 - Use get_person for one named person, and get_activity_log for admin history.
 You may call several tools in sequence. Once you have the facts, reply in clear, professional and courteous Markdown — and when names were requested, ACTUALLY LIST the people by name. If the data genuinely has no answer, say so plainly.
 
-You can also PREPARE actions: suspend_school, reactivate_school, deactivate_account, reactivate_account, invite_user, add_subject. CRITICAL: these tools only PREPARE the action and compute its impact — NOTHING is changed until the user clicks Confirm. After calling an action tool, clearly state exactly what will happen (including any impact) and tell the user to confirm. NEVER say an action is already done. If an action tool returns an error (target not found, already in that state, missing detail), explain it and ask for what's needed.`;
+You can also PREPARE actions: create_school, suspend_school, reactivate_school, deactivate_account, reactivate_account, invite_user, add_subject. CRITICAL: these tools only PREPARE the action and compute its impact — NOTHING is changed until the user clicks Confirm. After calling an action tool, clearly state exactly what will happen (including any impact) and tell the user to confirm. NEVER say an action is already done. If an action tool returns an error (target not found, already in that state, missing detail), explain it and ask for what's needed.`;
+}
+
+// A prompt rule alone does NOT reliably stop the model from resetting a vague
+// follow-up ("a summary", "and their emails?") to a whole-platform answer. So
+// when the latest user turn is a short follow-up, we deterministically inject a
+// hint that quotes what the assistant was just discussing and tells it to stay
+// on that topic. This anchors the decisive first step instead of relying on the
+// model to recall a rule buried in the system prompt.
+function followUpHint(convo) {
+  const last = convo[convo.length - 1];
+  if (!last || last.role !== 'user' || !last.content) return null;
+  if (last.content.trim().split(/\s+/).length > 9) return null; // long enough to stand alone
+  const prev = [...convo.slice(0, -1)].reverse().find((m) => m.role === 'assistant' && m.content && m.content.trim());
+  if (!prev) return null; // nothing prior to be a follow-up to
+  const topic = prev.content.replace(/\s+/g, ' ').trim().slice(0, 400);
+  return `The user's latest message ("${last.content.trim()}") is a brief FOLLOW-UP to what you were just discussing. Your previous reply was about:\n"""${topic}"""\nInterpret the follow-up in THAT context and answer about THAT same topic (e.g. "a summary" / "summarize" means summarise what you were just discussing, not the whole platform). Do NOT reset to a generic or whole-platform answer unless the user explicitly asks for one.`;
 }
 
 // Answer a free-text question by letting the model query the database via tools.
@@ -384,6 +423,10 @@ export async function runPlatformAssistant({ history, question, viewer }) {
     .map((m) => ({ role: m.role, content: m.content }))
     .slice(-HISTORY_LIMIT);
   const messages = [{ role: 'system', content: systemPrompt(viewer) }, ...convo];
+  // Anchor a vague follow-up to the current topic (placed last so it's the most
+  // recent instruction the model sees on the decisive first step).
+  const hint = followUpHint(convo);
+  if (hint) messages.push({ role: 'system', content: hint });
   let pendingAction = null; // an action awaiting the user's confirmation
   // Tools get the viewer plus everything the USER actually typed across the
   // conversation, so an action tool can refuse values (e.g. an email) the user
